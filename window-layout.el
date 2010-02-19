@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2010  SAKURAI Masashi
 
-;; Author: SAKURAI Masashi <sakurai@liza>
-;; Keywords: lisp
+;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
+;; Keywords: window, layout
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 ;;; Commentary:
 
 ;; Split a frame into some windows according to a layout recipe.
-;; 
-;; 
 
 ;;; Example code
 ;; 
