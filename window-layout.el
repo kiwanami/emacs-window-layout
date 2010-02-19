@@ -20,7 +20,11 @@
 
 ;;; Commentary:
 
-;; Example code
+;; Split a frame into some windows according to a layout recipe.
+;; 
+;; 
+
+;;; Example code
 ;; 
 ;; ;; Layout function
 ;; (setq strct 
@@ -33,7 +37,7 @@
 ;;           :max-size 10)
 ;;          (:name 'message
 ;;           :buffer "message buffer"
-;;           :default-show nil))))
+;;           :default-hide nil))))
 ;;
 ;; ;; Window control
 ;; (wlf:show   strct 'summary)
@@ -42,18 +46,18 @@
 ;; (wlf:select strct 'summary)
 ;;
 ;; ;; Accessing the buffer
-;; (wlf:get-buffer strct 'summary)
+;; (wlf:get-buffer strct 'summary) -> <#buffer object>
 ;; (wlf:set-buffer strct 'summary "*scratch*")
 ;;
-;; Layout recipi:
-;;   - : split veritically
-;;   | : split holizontally
+;; Layout recipe:
+;;   - : split vertically
+;;   | : split horizontally
 ;;
 ;; Window options:
 ;;   :name  [*] the window name
 ;;   :buffer  [*] a buffer name or a buffer object to show the window
 ;;   :size  (column or row number) window size
-;;   :max-size  (column or row number) if window size is larger than this value, the window is shrinked.
+;;   :max-size  (column or row number) if window size is larger than this value, the window is shrunken.
 ;;   :size-ratio  (0 - 1.0) window size ratio. the size of the other side is the rest.
 ;;   :default-hide  (t/nil) if nil, the window should be not displayed initially.
 ;;   :fix-size  (t/nil) if t, when the windows are re-layouted, the window size is not changed.
@@ -82,12 +86,12 @@
 (put 'wlf:acond 'lisp-indent-function 2)
 
 ;;; Window management structure
-;; name      : the symbol of window name.
-;; options   : option alist
+;; name      : a symbol of the window name.
+;; options   : an option alist given by the recipe.
 ;; shown     : 'show/'hide. if 'hide, the window is not displayed.
-;; window    : window object.
-;; vertical  : if the window is splitted vertically, the value is t.
-;; last-size : if the window is alive, the window size is saved before re-layouting.
+;; window    : a window object.
+;; vertical  : if the window is split vertically, the value is t.
+;; last-size : if the window is alive, the window size is saved before doing layout.
 
 (defstruct wlf:window name options shown window vertical last-size)
 
@@ -125,22 +129,23 @@
 (defun wlf:window-resize (winfo target-size)
   "[internal] Resize window."
   (let ((window (wlf:window-window winfo)))
-    (cond
-     ((wlf:window-vertical winfo)
-      (let ((current-size (window-height window)))
-        (shrink-window
-         (- current-size target-size))))
-     (t
-      (let ((current-size (window-width window)))
-        (shrink-window-horizontally 
-         (- current-size target-size)))))))
+    (with-selected-window window
+      (cond
+       ((wlf:window-vertical winfo)
+        (let ((current-size (window-height window)))
+          (shrink-window
+           (- current-size target-size))))
+      (t
+       (let ((current-size (window-width window)))
+         (shrink-window-horizontally 
+          (- current-size target-size))))))))
 
 (defmacro wlf:window-option-get (winfo option-key)
   "[internal] Return an option value."
   `(plist-get (wlf:window-options ,winfo) ',option-key))
 
 (defun wlf:clear-windows ()
-  "[internal] Destory windows and return last one window object."
+  "[internal] Destroy windows and return last one window object."
   (let ((frame (selected-frame)))
     (while (not (one-window-p))
       (delete-window))
@@ -154,38 +159,38 @@
          return i) it
          (error "Window name %s is not found." name)))
 
-(defun wlf:build-windows-rec (recipi winfo-list)
-  "[internal] Split the selected window with the recipi."
+(defun wlf:build-windows-rec (recipe winfo-list)
+  "[internal] Split the selected window with the recipe."
   (let* (
-         (split-type (car recipi))
+         (split-type (car recipe))
          (split-action 
           (cond
            ((eq '- split-type) 'split-window-vertically)
            ((eq '| split-type) 'split-window-horizontally)
            (t 'split-window-vertically)))
-         (former-recipi (cadr recipi))
-         (latter-recipi (caddr recipi))
+         (former-recipe (cadr recipe))
+         (latter-recipe (caddr recipe))
          (latter-window (funcall split-action))
          (former-window (selected-window))
          )
     (select-window former-window)
-    (if (symbolp former-recipi)
-        (let ((winfo (wlf:get-winfo former-recipi winfo-list)))
+    (if (symbolp former-recipe)
+        (let ((winfo (wlf:get-winfo former-recipe winfo-list)))
           (unless (wlf:window-shown winfo)
             (wlf:window-shown-set winfo (null (wlf:window-option-get winfo :default-hide))))
           (setf (wlf:window-window winfo) former-window)
           (setf (wlf:window-vertical winfo) (eq 'split-window-vertically split-action))
           (wlf:apply-winfo winfo))
-      (wlf:build-windows-rec former-recipi winfo-list))
+      (wlf:build-windows-rec former-recipe winfo-list))
     (select-window latter-window)
-    (if (symbolp latter-recipi)
-        (let ((winfo (wlf:get-winfo latter-recipi winfo-list)))
+    (if (symbolp latter-recipe)
+        (let ((winfo (wlf:get-winfo latter-recipe winfo-list)))
           (unless (wlf:window-shown winfo)
             (wlf:window-shown-set winfo (null (wlf:window-option-get winfo :default-hide))))
           (setf (wlf:window-window winfo) latter-window)
           (setf (wlf:window-vertical winfo) (eq 'split-window-vertically split-action))
           (wlf:apply-winfo winfo))
-      (wlf:build-windows-rec latter-recipi winfo-list))
+      (wlf:build-windows-rec latter-recipe winfo-list))
     ))
 
 (defun wlf:apply-winfo (winfo)
@@ -208,7 +213,7 @@
            ((wlf:window-option-get winfo :size-ratio)
             (wlf:window-resize winfo (truncate (* 2 (wlf:window-size winfo) it)))))
         ;; revert size
-        (wlf:window-resize winfo (wlf:window-size winfo))))))
+        (wlf:window-resize winfo (wlf:window-last-size winfo))))))
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
@@ -217,55 +222,57 @@
                  :name (plist-get p ':name)
                  :options p)))
 
-(defun wlf:save-current-window-sizes (structure)
+(defun wlf:save-current-window-sizes (winfo-list)
   "[internal] Save current window sizes."
-  (loop for winfo in (cdr structure)
+  (loop for winfo in winfo-list
         do (setf (wlf:window-last-size winfo)
-                 (if (window-live-p (wlf:window-window winfo))
+                 (if (and (wlf:window-window winfo) 
+                          (window-live-p (wlf:window-window winfo)))
                      (wlf:window-size winfo)))))
 
-(defun wlf:layout (recipi window-params)
+(defun wlf:layout (recipe window-params)
   "Layout windows and make management object."
   (let ((winfo-list (wlf:make-winfo-list window-params)))
-    (wlf:layout-internal recipi winfo-list)))
+    (wlf:layout-internal recipe winfo-list)))
 
-(defun wlf:layout-internal (recipi winfo-list)
+(defun wlf:layout-internal (recipe winfo-list)
   "[internal] Layout windows and make management object."
   (let ((last-buffer (current-buffer)) val)
     (save-excursion
+      (wlf:save-current-window-sizes winfo-list)
       (wlf:clear-windows)
       (wlf:build-windows-rec 
-       recipi winfo-list)
-      (setq val (cons recipi winfo-list)))
+       recipe winfo-list)
+      (setq val (cons recipe winfo-list)))
                                         ; Structure: 
-                                        ;   ((split recipi) . (window info))
+                                        ;   ((split recipe) . (window info))
     (wlf:aif (get-buffer-window last-buffer)
         (select-window it))
     val))
 
 (defun wlf:show (structure winfo-name)
   "Display the window."
-  (let* ((recipi (car structure))
+  (let* ((recipe (car structure))
          (winfo-list (cdr structure))
          (winfo (wlf:get-winfo winfo-name winfo-list)))
     (wlf:window-shown-set winfo t)
-    (wlf:layout-internal recipi winfo-list)))
+    (wlf:layout-internal recipe winfo-list)))
 
 (defun wlf:hide (structure winfo-name) 
   "Hide the window."
-  (let* ((recipi (car structure))
+  (let* ((recipe (car structure))
          (winfo-list (cdr structure))
          (winfo (wlf:get-winfo winfo-name winfo-list)))
     (wlf:window-shown-set winfo nil)
-    (wlf:layout-internal recipi winfo-list)))
+    (wlf:layout-internal recipe winfo-list)))
 
 (defun wlf:toggle (structure winfo-name)
   "Toggle the window."
-  (let* ((recipi (car structure))
+  (let* ((recipe (car structure))
          (winfo-list (cdr structure))
          (winfo (wlf:get-winfo winfo-name winfo-list)))
     (wlf:window-shown-toggle winfo)
-    (wlf:layout-internal recipi winfo-list)))
+    (wlf:layout-internal recipe winfo-list)))
 
 (defun wlf:select (structure winfo-name)
   "Select the window."
@@ -302,13 +309,12 @@ window."
 ;;          (:name summary :buffer "*Messages*" :size-ratio 0.5)
 ;;          (:name message :buffer "window-layout.el"))))
 
-;; (wlf:show ss 'message)
-;; (wlf:hide s 'message)
-;; (wlf:toggle s 'message)
-;; (wlf:select s 'summary)
-;; (wlf:get-buffer s 'message)
-;; (wlf:set-buffer s 'message "*scratch*")
-
+;; (wlf:show ss 'folder)
+;; (wlf:hide ss 'folder)
+;; (wlf:toggle ss 'folder)
+;; (wlf:select ss 'summary)
+;; (wlf:get-buffer ss 'message)
+;; (wlf:set-buffer ss 'message "*scratch*")
 
 (provide 'window-layout)
 ;;; window-layout.el ends here
