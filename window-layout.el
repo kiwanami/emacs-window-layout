@@ -3,6 +3,7 @@
 ;; Copyright (C) 2010  SAKURAI Masashi
 
 ;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
+;; Version: 1.0
 ;; Keywords: window, layout
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -81,7 +82,6 @@
          (if ,sym
              (let ((it ,sym)) ,@(cdr cl1))
            (wlf:acond ,@(cdr clauses)))))))
-(put 'wlf:acond 'lisp-indent-function 2)
 
 ;;; Window management structure
 ;; name      : a symbol of the window name.
@@ -133,10 +133,10 @@
         (let ((current-size (window-height window)))
           (shrink-window
            (- current-size target-size))))
-      (t
-       (let ((current-size (window-width window)))
-         (shrink-window-horizontally 
-          (- current-size target-size))))))))
+       (t
+        (let ((current-size (window-width window)))
+          (shrink-window-horizontally 
+           (- current-size target-size))))))))
 
 (defmacro wlf:window-option-get (winfo option-key)
   "[internal] Return an option value."
@@ -145,17 +145,16 @@
 (defun wlf:clear-windows ()
   "[internal] Destroy windows and return last one window object."
   (let ((frame (selected-frame)))
-    (while (not (one-window-p))
-      (delete-window))
+    (while (not (one-window-p)) (delete-window))
     (selected-window)))
 
 (defun wlf:get-winfo (name winfo-list)
   "[internal] Select a window info object from a winfo list."
   (wlf:aif 
-   (loop for i in winfo-list
-         when (eq (wlf:window-name i) name)
-         return i) it
-         (error "Window name %s is not found." name)))
+      (loop for i in winfo-list
+            when (eq (wlf:window-name i) name)
+            return i) it
+    (error "Window name %s is not found." name)))
 
 (defun wlf:build-windows-rec (recipe winfo-list)
   "[internal] Split the selected window with the recipe."
@@ -293,7 +292,7 @@ window."
 
 ;;; for test
 
-;; (setq s 
+;; (setq ss
 ;;       (wlf:layout
 ;;        '(| folder (- summary message))
 ;;        '((:name folder :buffer "*info*" :max-size 20)
