@@ -38,11 +38,12 @@
 ;;           :buffer "message buffer"
 ;;           :default-hide nil))))
 ;;
-;; ;; Window control
-;; (wlf:show   strct 'summary)
-;; (wlf:hide   strct 'summary)
-;; (wlf:toggle strct 'summary)
-;; (wlf:select strct 'summary)
+;; ;; Window controlling
+;; (wlf:show    strct 'summary)
+;; (wlf:hide    strct 'summary)
+;; (wlf:toggle  strct 'summary)
+;; (wlf:select  strct 'summary)
+;; (wlf:refresh strct)
 ;;
 ;; ;; Accessing the buffer
 ;; (wlf:get-buffer strct 'summary) -> <#buffer object>
@@ -68,6 +69,8 @@
 ;; window size may not be adjusted as you write.
 
 ;;; Code:
+
+(eval-when-compile (require 'cl))
 
 (defmacro wlf:aif (test-form then-form &rest else-forms)
   `(let ((it ,test-form))
@@ -246,6 +249,12 @@
     (wlf:aif (get-buffer-window last-buffer)
         (select-window it))
     val))
+
+(defun wlf:refresh (structure)
+  "Refresh the window layout."
+  (let* ((recipe (car structure))
+         (winfo-list (cdr structure)))
+    (wlf:layout-internal recipe winfo-list)))
 
 (defun wlf:show (structure winfo-name)
   "Display the window."
