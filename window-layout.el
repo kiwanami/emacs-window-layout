@@ -370,19 +370,19 @@ the argument of `wlf:layout'."
 
 ;;; for test
 
-(setq ss
-      (wlf:layout
-       '(| folder (- summary message))
-       '((:name folder :buffer "*info*" :max-size 20)
-         (:name summary :buffer "*Messages*" :max-size 10)
-         (:name message :buffer "window-layout.el" :default-hide nil)) t))
+;; (setq ss
+;;       (wlf:layout
+;;        '(| folder (- summary message))
+;;        '((:name folder :buffer "*info*" :max-size 20)
+;;          (:name summary :buffer "*Messages*" :max-size 10)
+;;          (:name message :buffer "window-layout.el" :default-hide nil)) t))
 
-(setq dd
-      (wlf:no-layout
-       '(| folder (| summary message))
-       '((:name folder :buffer "*info*" :size-ratio 0.33)
-         (:name summary :buffer "*Messages*" :size-ratio 0.5)
-         (:name message :buffer "window-layout.el")) t))
+;; (setq dd
+;;       (wlf:no-layout
+;;        '(| folder (| summary message))
+;;        '((:name folder :buffer "*info*" :size-ratio 0.33)
+;;          (:name summary :buffer "*Messages*" :size-ratio 0.5)
+;;          (:name message :buffer "window-layout.el")) t))
 
 ;; (wlf:show ss 'folder)
 ;; (wlf:hide ss 'folder)
