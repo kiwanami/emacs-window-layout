@@ -21,11 +21,13 @@
 
 ;;; Commentary:
 
-;; Split a frame into some windows according to a layout recipe.
+;; Split a frame or window into some windows according to a layout
+;; recipe.
 
 ;;; Example code
 
 ;; ;; Layout function
+;; ; -> three pane layout.
 ;; (setq wm ; <-- window management object
 ;;       (wlf:layout 
 ;;        '(| folder (- summary message))
@@ -33,7 +35,7 @@
 ;;           :buffer "folder buffer")
 ;;          (:name 'summary
 ;;           :buffer "summary buffer"
-;;           :max-size 10)
+;;           :max-size 15)
 ;;          (:name 'message
 ;;           :buffer "message buffer"
 ;;           :default-hide nil))))
@@ -62,12 +64,11 @@
 ;;   :buffer  [*] a buffer name or a buffer object to show the window
 ;;   :size  (column or row number) window size
 ;;   :max-size  (column or row number) if window size is larger than this value, the window is shrunken.
-;;   :size-ratio  (0 - 1.0) window size ratio. the size of the other side is the rest.
+;;   :size-ratio  (0.0 - 1.0) window size ratio. the size of the other side is the rest.
 ;;   :default-hide  (t/nil) if nil, the window should be not displayed initially.
 ;;   :fix-size  (t/nil) if t, when the windows are laid out again, the window size is not changed.
-
-;; * Note: 
-
+;; 
+;; Note: 
 ;; The size parameters, :size, :max-size and :size-ratio, are mutually
 ;; exclusive.  The size of a window is related with one of the other
 ;; side window. So, if both side windows set size parameters, the
@@ -179,7 +180,7 @@ start deviding."
     (while (not (one-window-p))
       (delete-window))
     (selected-window))
-   (t      ; cascaded window 
+   (t      ; nested windows
     (let ((wins 
            (loop for i in winfo-list
                  for win = (wlf:window-window i)
@@ -212,6 +213,9 @@ start deviding."
        (latter-recipe (caddr recipe))
        (latter-window (funcall split-action))
        (former-window (selected-window)))
+
+    (unless (window-live-p former-window)
+      (error "Can not create a window (former-window is not live)"))
     (select-window former-window)
     (if (symbolp former-recipe)
         (let ((winfo (wlf:get-winfo former-recipe winfo-list)))
@@ -221,6 +225,9 @@ start deviding."
           (setf (wlf:window-vertical winfo) (eq 'split-window-vertically split-action))
           (wlf:apply-winfo winfo))
       (wlf:build-windows-rec former-recipe winfo-list))
+
+    (unless (window-live-p latter-window)
+      (error "Can not create a window (latter-window is not live.)"))
     (select-window latter-window)
     (if (symbolp latter-recipe)
         (let ((winfo (wlf:get-winfo latter-recipe winfo-list)))
@@ -234,25 +241,24 @@ start deviding."
 
 (defun wlf:apply-winfo (winfo)
   "[internal] Apply window layout."
-  (let ((window (selected-window)))
-    (if (not (wlf:window-shown-p winfo))
-        (delete-window window)
-      (switch-to-buffer (get-buffer (wlf:window-option-get winfo :buffer)))
-      ;; apply size
-      (if (or (wlf:window-option-get winfo :fix-size)
-              (null (wlf:window-last-size winfo)))
-          ;; set size
-          (wlf:acond
-           ((wlf:window-option-get winfo :max-size)
-            (let ((size (wlf:window-size winfo)))
-              (if (< it size)
-                  (wlf:window-shrink winfo (- size it)))))
-           ((wlf:window-option-get winfo :size)
-            (wlf:window-resize winfo it))
-           ((wlf:window-option-get winfo :size-ratio)
-            (wlf:window-resize winfo (truncate (* 2 (wlf:window-size winfo) it)))))
-        ;; revert size
-        (wlf:window-resize winfo (wlf:window-last-size winfo))))))
+  (if (not (wlf:window-shown-p winfo))
+      (delete-window (selected-window))
+    (switch-to-buffer (get-buffer (wlf:window-option-get winfo :buffer)))
+    ;; apply size
+    (if (or (wlf:window-option-get winfo :fix-size)
+            (null (wlf:window-last-size winfo)))
+        ;; set size
+        (wlf:acond
+         ((wlf:window-option-get winfo :max-size)
+          (let ((size (wlf:window-size winfo)))
+            (if (< it size)
+                (wlf:window-shrink winfo (- size it)))))
+         ((wlf:window-option-get winfo :size)
+          (wlf:window-resize winfo it))
+         ((wlf:window-option-get winfo :size-ratio)
+          (wlf:window-resize winfo (truncate (* 2 (wlf:window-size winfo) it)))))
+      ;; revert size
+      (wlf:window-resize winfo (wlf:window-last-size winfo)))))
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
@@ -261,13 +267,19 @@ start deviding."
                  :name (plist-get p ':name)
                  :options p)))
 
-(defun wlf:save-current-window-sizes (winfo-list)
+(defun wlf:save-current-window-sizes (recipe winfo-list)
   "[internal] Save current window sizes, before clearing the windows."
   (loop for winfo in winfo-list
-        do (setf (wlf:window-last-size winfo)
-                 (if (and (wlf:window-window winfo) 
-                          (window-live-p (wlf:window-window winfo)))
-                     (wlf:window-size winfo)))))
+        do (setf (wlf:window-last-size winfo) nil))
+  (wlf:aif
+   (frame-parameter (selected-frame) 'wlf:recipe)
+   (if (equal recipe it)
+       (loop for winfo in winfo-list
+             do (setf (wlf:window-last-size winfo)
+                      (if (and (wlf:window-window winfo) 
+                               (window-live-p (wlf:window-window winfo)))
+                          (wlf:window-size winfo) nil)))))
+  (set-frame-parameter (selected-frame) 'wlf:recipe recipe))
 
 (defun wlf:layout (recipe window-params &optional wholep)
   "Lay out windows and return a management object.
@@ -281,7 +293,8 @@ See the comment text to know the further information about parameters.
     (wlf:layout-internal recipe winfo-list wholep)))
 
 (defun wlf:no-layout (recipe window-params &optional wholep)
-  "Just return a management object. See the `wlf:layout' function."
+  "Just return a management object, does not change window
+layout. See the comment of `wlf:layout' function for arguments."
   (let ((winfo-list (wlf:make-winfo-list window-params)))
     (make-wlf:wset :recipe recipe 
                    :winfo-list winfo-list
@@ -290,7 +303,7 @@ See the comment text to know the further information about parameters.
 (defun wlf:layout-internal (recipe winfo-list wholep)
   "[internal] Lay out windows and return a management object."
   (let ((last-buffer (current-buffer)) val)
-    (wlf:save-current-window-sizes winfo-list)
+    (wlf:save-current-window-sizes recipe winfo-list)
     (select-window (wlf:clear-windows winfo-list wholep))
     (wlf:build-windows-rec recipe winfo-list)
     (setq val (make-wlf:wset :recipe recipe 
@@ -368,7 +381,7 @@ the argument of `wlf:layout'."
   (wlf:window-option-get 
    (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)) :buffer))
 
-;;; for test
+;;; test
 
 ;; (setq ss
 ;;       (wlf:layout
@@ -390,6 +403,7 @@ the argument of `wlf:layout'."
 ;; (wlf:select ss 'summary)
 ;; (wlf:get-buffer ss 'message)
 ;; (wlf:set-buffer ss 'message "*scratch*")
+;; (wlf:refresh ss)
 ;; (wlf:refresh dd)
 
 (provide 'window-layout)
