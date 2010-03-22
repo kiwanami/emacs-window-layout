@@ -381,6 +381,22 @@ the argument of `wlf:layout'."
   (wlf:window-option-get 
    (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)) :buffer))
 
+(defun wlf:wopts-replace-buffer (wopts buffer-alist)
+  "Helper function for the argument of `wlf:layout'. This
+function replaces or adds buffer objects in the window options.
+WOPTS is a window option list. BUFFER-ALIST is an alist of pairs
+of a window name and a buffer object (or buffer name)."
+  (loop 
+   for pair in buffer-alist
+   for name = (car pair)
+   for buf = (cdr pair)
+   for opts = (loop
+               for i in wopts 
+               if (eq (plist-get i ':name) name) 
+               return i)
+   do (plist-put opts ':buffer buf))
+  wopts)
+
 ;;; test
 
 ;; (setq ss
@@ -405,6 +421,12 @@ the argument of `wlf:layout'."
 ;; (wlf:set-buffer ss 'message "*scratch*")
 ;; (wlf:refresh ss)
 ;; (wlf:refresh dd)
+
+;; (wlf:wopts-replace-buffer 
+;;  '((:name folder :buffer "*info*" :max-size 20)
+;;    (:name summary :buffer "*Messages*" :max-size 10)
+;;    (:name message :buffer "window-layout.el" :default-hide nil))
+;;  '((folder . "*Messages*") (summary . "*scratch*")))
 
 (provide 'window-layout)
 ;;; window-layout.el ends here
