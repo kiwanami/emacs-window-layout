@@ -184,7 +184,7 @@ start deviding."
     (let ((wins 
            (loop for i in winfo-list
                  for win = (wlf:window-window i)
-                 if (window-live-p win)
+                 if (and win (window-live-p win))
                  collect win)))
       (if (> (length wins) 1)
           (loop for w in (cdr wins)
@@ -243,7 +243,8 @@ start deviding."
   "[internal] Apply window layout."
   (if (not (wlf:window-shown-p winfo))
       (delete-window (selected-window))
-    (switch-to-buffer (get-buffer (wlf:window-option-get winfo :buffer)))
+    (wlf:aif (wlf:window-option-get winfo :buffer)
+        (switch-to-buffer (get-buffer it)))
     ;; apply size
     (if (or (wlf:window-option-get winfo :fix-size)
             (null (wlf:window-last-size winfo)))
