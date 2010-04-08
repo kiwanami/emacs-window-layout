@@ -51,6 +51,11 @@
 ;; (wlf:get-buffer wm 'summary) -> <#buffer object>
 ;; (wlf:set-buffer wm 'summary "*scratch*")
 
+;; ;; Layout hook
+;; (defun wlf:test-hook (wset) (message "HOOK : %s" wset))
+;; (wlf:layout-hook-add wm 'wlf:test-hook)
+;; (wlf:layout-hook-remove wm 'wlf:test-hook)
+
 ;;; `wlf:layout' function
 
 ;; * Layout recipe:
@@ -61,12 +66,12 @@
 ;; * Window options:
 
 ;;   :name  [*] the window name
-;;   :buffer  [*] a buffer name or a buffer object to show the window
+;;   :buffer  a buffer name or a buffer object to show the window
 ;;   :size  (column or row number) window size
 ;;   :max-size  (column or row number) if window size is larger than this value, the window is shrunken.
 ;;   :size-ratio  (0.0 - 1.0) window size ratio. the size of the other side is the rest.
-;;   :default-hide  (t/nil) if nil, the window should be not displayed initially.
-;;   :fix-size  (t/nil) if t, when the windows are laid out again, the window size is not changed.
+;;   :default-hide  (t/nil) if t, the window is hided initially. (default: nil)
+;;   :fix-size  (t/nil) if t, when the windows are laid out again, the window size is remained. (default: nil)
 ;; 
 ;; Note: 
 ;; The size parameters, :size, :max-size and :size-ratio, are mutually
@@ -87,6 +92,11 @@
 ;; You should not access the management object directly, because it is not 
 ;; intended direct access.
 ;; You can make some management objects to switch the window layout.
+
+;; * Layout hook
+
+;; When splitting windows, registered hook are called with one
+;; argument, the window management object. 
 
 ;;; Code:
 
@@ -176,7 +186,7 @@
 
 (defun wlf:clear-windows (winfo-list wholep)
   "[internal] Destroy windows and return the window object to
-start deviding."
+start dividing."
   (cond 
    (wholep ; using the whole area 
     (delete-other-windows)
