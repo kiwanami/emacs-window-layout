@@ -107,11 +107,13 @@
            (wlf:acond ,@(cdr clauses)))))))
 
 ;;; Window-set management structure
-;; recipe     : an input recipe object.
-;; winfo-list : a list of window management structures.
-;; wholep     : if non nil, this function uses whole frame window.
+;; recipe      : an input recipe object.
+;; winfo-list  : a list of window management structures.
+;; wholep      : if non nil, this function uses whole frame window.
+;; layout-hook : if doing layout windows, these hooks are called. 
+;;               The hook function has one argument: wset object.
 
-(defstruct wlf:wset recipe winfo-list wholep)
+(defstruct wlf:wset recipe winfo-list wholep layout-hook)
 
 ;;; Window management structure
 ;; name      : a symbol of the window name.
@@ -177,8 +179,7 @@
 start deviding."
   (cond 
    (wholep ; using the whole area 
-    (while (not (one-window-p))
-      (delete-window))
+    (delete-other-windows)
     (selected-window))
    (t      ; nested windows
     (let ((wins 
@@ -290,8 +291,7 @@ If WHOLEP is non-nil, this function uses the entire space of the current frame.
 If WHOLEP is nil, this function splits the windows within the current window.
 See the comment text to know the further information about parameters.
 "
-  (let ((winfo-list (wlf:make-winfo-list window-params)))
-    (wlf:layout-internal recipe winfo-list wholep)))
+  (wlf:layout-internal (wlf:no-layout recipe window-params wholep)))
 
 (defun wlf:no-layout (recipe window-params &optional wholep)
   "Just return a management object, does not change window
@@ -301,65 +301,86 @@ layout. See the comment of `wlf:layout' function for arguments."
                    :winfo-list winfo-list
                    :wholep wholep)))
 
-(defun wlf:layout-internal (recipe winfo-list wholep)
+(defun wlf:layout-internal (wset)
   "[internal] Lay out windows and return a management object."
-  (let ((last-buffer (current-buffer)) val)
-    (wlf:save-current-window-sizes recipe winfo-list)
-    (select-window (wlf:clear-windows winfo-list wholep))
-    (wlf:build-windows-rec recipe winfo-list)
-    (setq val (make-wlf:wset :recipe recipe 
-                             :winfo-list winfo-list
-                             :wholep wholep))
-    (wlf:aif (get-buffer-window last-buffer)
-        (select-window it))
-    val))
+  (wlf:with-wset wset
+    (let ((last-buffer (current-buffer)) val)
+      (wlf:save-current-window-sizes recipe winfo-list)
+      (select-window (wlf:clear-windows winfo-list wholep))
+      (wlf:build-windows-rec recipe winfo-list)
+      (setq val (make-wlf:wset :recipe recipe 
+                               :winfo-list winfo-list
+                               :wholep wholep))
+      
+      (loop for h in (wlf:wset-layout-hook wset)
+            do (funcall h wset))
+      
+      (wlf:aif (get-buffer-window last-buffer)
+          (select-window it))
+      val)))
 
 (defmacro wlf:with-wset (wset &rest body)
   (declare (indent 1))
   `(let* 
        ((recipe (wlf:wset-recipe wset))
         (winfo-list (wlf:wset-winfo-list wset))
-        (wholep (wlf:wset-wholep wset)))
+        (wholep (wlf:wset-wholep wset))
+        (layout-hook (wlf:wset-layout-hook wset)))
      ,@body))
+
+(defun wlf:layout-hook-add (wset func)
+  "Add FUNC to layout-hook of the WSET, and return the layout-hook. 
+The function FUNC should have one argument : wset object."
+  (let ((hook (wlf:wset-layout-hook wset)))
+    (unless (member func hook) 
+      (setf (wlf:wset-layout-hook wset) (cons func hook)))
+    (wlf:wset-layout-hook wset)))
+
+(defun wlf:layout-hook-remove (wset func)
+  "Remove FUNC from layout-hook of the WSET, and return the layout-hook."
+  (let ((hook (wlf:wset-layout-hook wset)))
+    (when (member func hook)
+      (setf (wlf:wset-layout-hook wset) (remove func hook)))
+    (wlf:wset-layout-hook wset)))
 
 (defun wlf:refresh (wset)
   "Refresh the window layout. WSET is a management object which
 is returned by `wlf:layout'."
-  (wlf:with-wset wset 
-    (wlf:layout-internal recipe winfo-list wholep)))
+  (wlf:layout-internal wset))
 
 (defun wlf:show (wset winfo-name)
   "Display the window. WSET is the management object which is
 returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (wlf:with-wset wset
-    (wlf:window-shown-set (wlf:get-winfo winfo-name winfo-list) t)
-    (wlf:layout-internal recipe winfo-list wholep)))
+  (wlf:window-shown-set 
+   (wlf:get-winfo
+    winfo-name (wlf:wset-winfo-list wset)) t)
+  (wlf:layout-internal wset))
 
 (defun wlf:hide (wset winfo-name) 
   "Hide the window. WSET is the management object which
 is returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (wlf:with-wset wset
-    (wlf:window-shown-set (wlf:get-winfo winfo-name winfo-list) nil)
-    (wlf:layout-internal recipe winfo-list wholep)))
+  (wlf:window-shown-set
+   (wlf:get-winfo 
+    winfo-name (wlf:wset-winfo-list wset)) nil)
+  (wlf:layout-internal wset))
 
 (defun wlf:toggle (wset winfo-name)
   "Toggle the window. WSET is the management object which
 is returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (wlf:with-wset wset
-    (wlf:window-shown-toggle (wlf:get-winfo winfo-name winfo-list))
-    (wlf:layout-internal recipe winfo-list wholep)))
+  (wlf:window-shown-toggle
+   (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))
+  (wlf:layout-internal wset))
 
 (defun wlf:select (wset winfo-name)
   "Select the window. WSET is the management object which
 is returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (wlf:with-wset wset
-    (select-window
-     (wlf:window-window
-      (wlf:get-winfo winfo-name winfo-list)))))
+  (select-window
+   (wlf:window-window
+    (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))))
 
 (defun wlf:set-buffer (wset winfo-name buf)
   "Set the buffer on the window. WSET is the management object
@@ -428,6 +449,10 @@ of a window name and a buffer object (or buffer name)."
 ;;    (:name summary :buffer "*Messages*" :max-size 10)
 ;;    (:name message :buffer "window-layout.el" :default-hide nil))
 ;;  '((folder . "*Messages*") (summary . "*scratch*")))
+
+;; (defun wlf:test-hook (wset) (message "HOOK : %s" wset))
+;; (wlf:layout-hook-add ss 'wlf:test-hook)
+;; (wlf:layout-hook-remove ss 'wlf:test-hook)
 
 (provide 'window-layout)
 ;;; window-layout.el ends here
