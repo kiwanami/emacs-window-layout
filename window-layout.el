@@ -255,7 +255,8 @@ start dividing."
   (if (not (wlf:window-shown-p winfo))
       (delete-window (selected-window))
     (wlf:aif (wlf:window-option-get winfo :buffer)
-        (switch-to-buffer (get-buffer it)))
+        (when (buffer-live-p it)
+          (switch-to-buffer (get-buffer it))))
     ;; apply size
     (if (or (wlf:window-option-get winfo :fix-size)
             (null (wlf:window-last-size winfo)))
@@ -385,12 +386,25 @@ defined by the argument of `wlf:layout'."
   (wlf:layout-internal wset))
 
 (defun wlf:select (wset winfo-name)
-  "Select the window. WSET is the management object which
-is returned by `wlf:layout'. WINFO-NAME is the window name which is
-defined by the argument of `wlf:layout'."
-  (select-window
-   (wlf:window-window
-    (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))))
+  "Select the indicated window. WSET is the management object
+which is returned by `wlf:layout'. WINFO-NAME is the window name
+which is defined by the argument of `wlf:layout'. If the window
+is nil or deleted, no window is selected."
+  (wlf:aif 
+      (wlf:window-window
+       (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))
+      (if (window-live-p it)
+        (select-window it))))
+
+(defun wlf:get-window (wset winfo-name)
+  "Return the indicated window. WSET is the management object
+which is returned by `wlf:layout'. WINFO-NAME is the window name
+which is defined by the argument of `wlf:layout'. If the window
+is nil or deleted, return nil."
+  (wlf:aif
+      (wlf:window-window
+       (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))
+      (if (window-live-p it) it)))
 
 (defun wlf:set-buffer (wset winfo-name buf)
   "Set the buffer on the window. WSET is the management object
@@ -401,7 +415,8 @@ name or object to show in the window."
          (wlf:get-winfo 
           winfo-name (wlf:wset-winfo-list wset))))
     (plist-put (wlf:window-options winfo) :buffer buf)
-    (select-window (wlf:window-window winfo))
+    (wlf:aif (wlf:window-window winfo)
+        (select-window it)) ; 
     (switch-to-buffer buf)))
 
 (defun wlf:get-buffer (wset winfo-name)
