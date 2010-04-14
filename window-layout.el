@@ -30,15 +30,18 @@
 ;; ; -> three pane layout.
 ;; (setq wm ; <-- window management object
 ;;       (wlf:layout 
-;;        '(| folder (- summary message))
+;;        '(| (:left-size-ratio 0.3) 
+;;            folder 
+;;            (- (:upper-max-size 15) 
+;;               summary 
+;;               message))
 ;;        '((:name 'folder 
 ;;           :buffer "folder buffer")
 ;;          (:name 'summary
-;;           :buffer "summary buffer"
-;;           :max-size 15)
+;;           :buffer "summary buffer")
 ;;          (:name 'message
-;;           :buffer "message buffer"
-;;           :default-hide nil))))
+;;           :buffer "message buffer")
+;;         )))
 ;;
 ;; ;; Window controlling
 ;; (wlf:show    wm 'summary)
@@ -60,32 +63,39 @@
 
 ;; * Layout recipe:
 
+;; ( (split type) (split option) 
+;;                (left window name or recipe)
+;;                (right window name or recipe) )
+
 ;;   - : split vertically
 ;;   | : split horizontally
 
-;; * Window options:
-
-;;   :name  [*] the window name
-;;   :buffer  a buffer name or a buffer object to show the window
-;;   :size  (column or row number) window size
-;;   :max-size  (column or row number) if window size is larger than this value, the window is shrunken.
-;;   :size-ratio  (0.0 - 1.0) window size ratio. the size of the other side is the rest.
-;;   :default-hide  (t/nil) if t, the window is hided initially. (default: nil)
-;;   :fix-size  (t/nil) if t, when the windows are laid out again, the window size is remained. (default: nil)
+;; split option (the prefix 'left' can be replaced by 'right', 'upper' and 'lower'.)
+;;   :left-size  (column or row number) window size
+;;   :left-max-size  (column or row number) if window size is larger than this value, the window is shrunken.
+;;   :left-size-ratio  (0.0 - 1.0) window size ratio. the size of the other side is the rest.
 ;; 
 ;; Note: 
+;; The split option can be omitted.
 ;; The size parameters, :size, :max-size and :size-ratio, are mutually
 ;; exclusive.  The size of a window is related with one of the other
 ;; side window. So, if both side windows set size parameters, the
 ;; window size may not be adjusted as you write.
 
-;; * wholep option:
+;; * Window options:
 
-;; If this option is nil or omitted, this function splits the windows
-;; within the current window. If this option is non-nil, this function
+;;   :name  [*] the window name.
+;;   :buffer  a buffer name or a buffer object to show the window. If nil or omitted, the current buffer remains.
+;;   :default-hide  (t/nil) if t, the window is hided initially. (default: nil)
+;;   :fix-size  (t/nil) if t, when the windows are laid out again, the window size is remained. (default: nil)
+
+;; * subwindow-p option:
+
+;; If this option is not nil, this function splits the windows within
+;; the current window. If this option is nil or omitted, this function
 ;; uses the entire space of the current frame. Because some user
-;; actions and complicated window layouts may cause unexpected
-;; split behaviors, it is easy to use the entire space of a frame.
+;; actions and complicated window layouts may cause unexpected split
+;; behaviors, it is easy to use the entire space of a frame.
 
 ;; * Return value (Window management object):
 
@@ -157,29 +167,6 @@
      (t
       (window-width window)))))
 
-(defun wlf:window-shrink (winfo shrink-size)
-  "[internal] Shrink window size."
-  (let ((window (wlf:window-window winfo)))
-    (cond
-     ((wlf:window-vertical winfo)
-      (shrink-window shrink-size))
-     (t
-      (shrink-window-horizontally shrink-size)))))
-
-(defun wlf:window-resize (winfo target-size)
-  "[internal] Resize window."
-  (let ((window (wlf:window-window winfo)))
-    (with-selected-window window
-      (cond
-       ((wlf:window-vertical winfo)
-        (let ((current-size (window-height window)))
-          (shrink-window
-           (- current-size target-size))))
-       (t
-        (let ((current-size (window-width window)))
-          (shrink-window-horizontally 
-           (- current-size target-size))))))))
-
 (defmacro wlf:window-option-get (winfo option-key)
   "[internal] Return an option value from an option property list."
   `(plist-get (wlf:window-options ,winfo) ',option-key))
@@ -220,26 +207,36 @@ start dividing."
          ((eq '- split-type) 'split-window-vertically)
          ((eq '| split-type) 'split-window-horizontally)
          (t 'split-window-vertically)))
-       (former-recipe (cadr recipe))
-       (latter-recipe (caddr recipe))
+       (verticalp (eq 'split-window-vertically split-action))
+       (split-options nil)
+       (recipe-nodes (if (= 3 (length recipe))
+                         (cdr recipe)
+                       (setq split-options (cadr recipe))
+                       (cddr recipe)))
+       (former-recipe (car recipe-nodes))
+       (latter-recipe (cadr recipe-nodes))
        (latter-window (funcall split-action))
        (former-window (selected-window)))
 
     (unless (window-live-p former-window)
       (error "Can not create a window (former-window is not live)"))
     (select-window former-window)
+    (when split-options
+      (wlf:apply-split-options split-options former-window verticalp t))
     (if (symbolp former-recipe)
         (let ((winfo (wlf:get-winfo former-recipe winfo-list)))
           (unless (wlf:window-shown winfo)
             (wlf:window-shown-set winfo (null (wlf:window-option-get winfo :default-hide))))
           (setf (wlf:window-window winfo) former-window)
-          (setf (wlf:window-vertical winfo) (eq 'split-window-vertically split-action))
+          (setf (wlf:window-vertical winfo) verticalp)
           (wlf:apply-winfo winfo))
       (wlf:build-windows-rec former-recipe winfo-list))
 
     (unless (window-live-p latter-window)
       (error "Can not create a window (latter-window is not live.)"))
     (select-window latter-window)
+    (when split-options
+      (wlf:apply-split-options split-options latter-window verticalp nil))
     (if (symbolp latter-recipe)
         (let ((winfo (wlf:get-winfo latter-recipe winfo-list)))
           (unless (wlf:window-shown winfo)
@@ -250,28 +247,73 @@ start dividing."
       (wlf:build-windows-rec latter-recipe winfo-list))
     ))
 
+(defun wlf:apply-split-options (split-options window verticalp leftp)
+  "[internal] Apply split options to the current window."
+  ; TODO improve this!
+  (let ((size (if verticalp
+                  (window-height window)
+                (window-width window))))
+    (cond
+     (leftp
+      (wlf:acond
+       ((plist-get split-options ':left-max-size)
+        (if (< it size)
+            (wlf:window-shrink window verticalp (- size it))))
+       ((plist-get split-options ':left-size)
+        (wlf:window-resize window verticalp it))
+       ((plist-get split-options ':left-size-ratio)
+        (wlf:window-resize 
+         window verticalp
+         (truncate (* 2 size it))))))
+     (t
+      (wlf:acond
+       ((plist-get split-options ':right-max-size)
+        (if (< it size)
+            (wlf:window-shrink window verticalp (- size it))))
+       ((plist-get split-options ':right-size)
+        (wlf:window-resize window verticalp it))
+       ((plist-get split-options ':right-size-ratio)
+        (wlf:window-resize
+         window verticalp 
+         (truncate (* 2 size it))))))
+     )))
+
+(defun wlf:window-shrink (window verticalp shrink-size)
+  "[internal] Shrink window size."
+  (cond
+   (verticalp
+    (shrink-window shrink-size))
+   (t
+    (shrink-window-horizontally shrink-size))))
+
+(defun wlf:window-resize (window verticalp target-size)
+  "[internal] Resize window."
+  (with-selected-window window
+    (cond
+     (verticalp
+      (let ((current-size (window-height window)))
+        (shrink-window
+         (- current-size target-size))))
+     (t
+      (let ((current-size (window-width window)))
+        (shrink-window-horizontally 
+         (- current-size target-size)))))))
+
 (defun wlf:apply-winfo (winfo)
-  "[internal] Apply window layout."
+  "[internal] Apply layout options to the current window."
   (if (not (wlf:window-shown-p winfo))
       (delete-window (selected-window))
     (wlf:aif (wlf:window-option-get winfo :buffer)
-        (when (buffer-live-p it)
+        (when (buffer-live-p (get-buffer it))
           (switch-to-buffer (get-buffer it))))
     ;; apply size
-    (if (or (wlf:window-option-get winfo :fix-size)
-            (null (wlf:window-last-size winfo)))
-        ;; set size
-        (wlf:acond
-         ((wlf:window-option-get winfo :max-size)
-          (let ((size (wlf:window-size winfo)))
-            (if (< it size)
-                (wlf:window-shrink winfo (- size it)))))
-         ((wlf:window-option-get winfo :size)
-          (wlf:window-resize winfo it))
-         ((wlf:window-option-get winfo :size-ratio)
-          (wlf:window-resize winfo (truncate (* 2 (wlf:window-size winfo) it)))))
+    (when (and (null (wlf:window-option-get winfo :fix-size))
+               (wlf:window-last-size winfo))
       ;; revert size
-      (wlf:window-resize winfo (wlf:window-last-size winfo)))))
+      (wlf:window-resize
+       (wlf:window-window winfo) 
+       (wlf:window-vertical winfo)
+       (wlf:window-last-size winfo)))))
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
@@ -294,23 +336,23 @@ start dividing."
                           (wlf:window-size winfo) nil)))))
   (set-frame-parameter (selected-frame) 'wlf:recipe recipe))
 
-(defun wlf:layout (recipe window-params &optional wholep)
+(defun wlf:layout (recipe window-params &optional subwindow-p)
   "Lay out windows and return a management object.
 RECIPE is a structure of splitting windows. 
 WINDOW-PARAMS is a list of the window layout parameters.
-If WHOLEP is non-nil, this function uses the entire space of the current frame.
-If WHOLEP is nil, this function splits the windows within the current window.
+If SUBWINDOW-P is nil, this function uses the entire space of the current frame.
+If SUBWINDOW-P is non-nil, this function splits the windows within the current window.
 See the comment text to know the further information about parameters.
 "
-  (wlf:layout-internal (wlf:no-layout recipe window-params wholep)))
+  (wlf:layout-internal (wlf:no-layout recipe window-params subwindow-p)))
 
-(defun wlf:no-layout (recipe window-params &optional wholep)
+(defun wlf:no-layout (recipe window-params &optional subwindow-p)
   "Just return a management object, does not change window
 layout. See the comment of `wlf:layout' function for arguments."
   (let ((winfo-list (wlf:make-winfo-list window-params)))
     (make-wlf:wset :recipe recipe 
                    :winfo-list winfo-list
-                   :wholep wholep)))
+                   :wholep (not subwindow-p))))
 
 (defun wlf:layout-internal (wset)
   "[internal] Lay out windows and return a management object."
@@ -448,17 +490,27 @@ of a window name and a buffer object (or buffer name)."
 
 ;; (setq ss
 ;;       (wlf:layout
-;;        '(| folder (- summary message))
-;;        '((:name folder :buffer "*info*" :max-size 20)
-;;          (:name summary :buffer "*Messages*" :max-size 10)
-;;          (:name message :buffer "window-layout.el" :default-hide nil)) t))
+;;        '(|
+;;          (:left-max-size 20)
+;;          folder 
+;;          (- 
+;;           (:left-size-ratio 0.3)
+;;           summary message))
+;;        '((:name folder :buffer "*info*")
+;;          (:name summary :buffer "*Messages*")
+;;          (:name message :buffer "window-layout.el" :default-hide nil))))
 
 ;; (setq dd
 ;;       (wlf:no-layout
-;;        '(| folder (| summary message))
-;;        '((:name folder :buffer "*info*" :size-ratio 0.33)
-;;          (:name summary :buffer "*Messages*" :size-ratio 0.5)
-;;          (:name message :buffer "window-layout.el")) t))
+;;        '(| 
+;;          (:left-size-ratio 0.33)
+;;          folder 
+;;          (| 
+;;           (:left-size-ratio 0.5)
+;;           summary message))
+;;        '((:name folder :buffer "*info*")
+;;          (:name summary :buffer "*Messages*")
+;;          (:name message :buffer "window-layout.el"))))
 
 ;; (wlf:show ss 'folder)
 ;; (wlf:hide ss 'folder)
