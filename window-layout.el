@@ -208,11 +208,8 @@ start dividing."
          ((eq '| split-type) 'split-window-horizontally)
          (t 'split-window-vertically)))
        (verticalp (eq 'split-window-vertically split-action))
-       (split-options nil)
-       (recipe-nodes (if (= 3 (length recipe))
-                         (cdr recipe)
-                       (setq split-options (cadr recipe))
-                       (cddr recipe)))
+       (split-options (cadr recipe))
+       (recipe-nodes  (cddr recipe))
        (former-recipe (car recipe-nodes))
        (latter-recipe (cadr recipe-nodes))
        (latter-window (funcall split-action))
@@ -221,8 +218,9 @@ start dividing."
     (unless (window-live-p former-window)
       (error "Can not create a window (former-window is not live)"))
     (select-window former-window)
-    (when split-options
-      (wlf:apply-split-options split-options former-window verticalp t))
+    (when (and split-options
+               (plist-get split-options ':leftp))
+      (wlf:apply-split-options split-options verticalp))
     (if (symbolp former-recipe)
         (let ((winfo (wlf:get-winfo former-recipe winfo-list)))
           (unless (wlf:window-shown winfo)
@@ -235,8 +233,9 @@ start dividing."
     (unless (window-live-p latter-window)
       (error "Can not create a window (latter-window is not live.)"))
     (select-window latter-window)
-    (when split-options
-      (wlf:apply-split-options split-options latter-window verticalp nil))
+    (when (and split-options
+               (plist-get split-options ':rightp))
+      (wlf:apply-split-options split-options verticalp))
     (if (symbolp latter-recipe)
         (let ((winfo (wlf:get-winfo latter-recipe winfo-list)))
           (unless (wlf:window-shown winfo)
@@ -247,36 +246,22 @@ start dividing."
       (wlf:build-windows-rec latter-recipe winfo-list))
     ))
 
-(defun wlf:apply-split-options (split-options window verticalp leftp)
+(defun wlf:apply-split-options (split-options verticalp)
   "[internal] Apply split options to the current window."
-  ; TODO improve this!
   (let ((size (if verticalp
-                  (window-height window)
-                (window-width window))))
-    (cond
-     (leftp
-      (wlf:acond
-       ((plist-get split-options ':left-max-size)
-        (if (< it size)
-            (wlf:window-shrink window verticalp (- size it))))
-       ((plist-get split-options ':left-size)
-        (wlf:window-resize window verticalp it))
-       ((plist-get split-options ':left-size-ratio)
-        (wlf:window-resize 
-         window verticalp
-         (truncate (* 2 size it))))))
-     (t
-      (wlf:acond
-       ((plist-get split-options ':right-max-size)
-        (if (< it size)
-            (wlf:window-shrink window verticalp (- size it))))
-       ((plist-get split-options ':right-size)
-        (wlf:window-resize window verticalp it))
-       ((plist-get split-options ':right-size-ratio)
-        (wlf:window-resize
-         window verticalp 
-         (truncate (* 2 size it))))))
-     )))
+                  (window-height)
+                (window-width))))
+    (wlf:acond
+     ((plist-get split-options ':max-size)
+      (if (< it size)
+          (wlf:window-shrink (selected-window) 
+                             verticalp (- size it))))
+     ((plist-get split-options ':size)
+      (wlf:window-resize (selected-window) verticalp it))
+     ((plist-get split-options ':size-ratio)
+      (wlf:window-resize 
+       (selected-window) verticalp
+       (truncate (* 2 size it)))))))
 
 (defun wlf:window-shrink (window verticalp shrink-size)
   "[internal] Shrink window size."
@@ -322,6 +307,43 @@ start dividing."
                  :name (plist-get p ':name)
                  :options p)))
 
+(defun wlf:translate-recipe (recipe)
+  "[internal] Translate split options recursively. 
+:left-foo, :upper-foo  -->  :leftp t :foo 
+:right-foo, :lower-foo  -->  :rightp t :foo 
+"
+  (if (or (symbolp recipe) (null recipe))
+      recipe
+    (let* 
+        (split-options 
+         new-split-options
+         (recipe-nodes
+          (if (= 3 (length recipe))
+              (cdr recipe)
+            (setq split-options (cadr recipe))
+            (cddr recipe))))
+      (when split-options
+        (loop for i in split-options
+              do
+              (if (symbolp i)
+                  (let* ((label-name (symbol-name i)))
+                    (wlf:acond
+                     ((string-match ":\\(left\\|upper\\)-" label-name)
+                      (setq label-name
+                            (concat ":" (substring label-name (match-end 0))))
+                      (push ':leftp new-split-options)
+                      (push t new-split-options))
+                     ((string-match ":\\(right\\|lower\\)-" label-name)
+                      (setq label-name
+                            (concat ":" (substring label-name (match-end 0))))
+                      (push ':rightp new-split-options)
+                      (push t new-split-options)))
+                    (push (intern label-name) new-split-options))
+                (push i new-split-options))))
+      (list (car recipe) (nreverse new-split-options)
+            (wlf:translate-recipe (car recipe-nodes))
+            (wlf:translate-recipe (cadr recipe-nodes))))))
+
 (defun wlf:save-current-window-sizes (recipe winfo-list)
   "[internal] Save current window sizes, before clearing the windows."
   (loop for winfo in winfo-list
@@ -349,10 +371,9 @@ See the comment text to know the further information about parameters.
 (defun wlf:no-layout (recipe window-params &optional subwindow-p)
   "Just return a management object, does not change window
 layout. See the comment of `wlf:layout' function for arguments."
-  (let ((winfo-list (wlf:make-winfo-list window-params)))
-    (make-wlf:wset :recipe recipe 
-                   :winfo-list winfo-list
-                   :wholep (not subwindow-p))))
+  (make-wlf:wset :recipe (wlf:translate-recipe recipe)
+                 :winfo-list (wlf:make-winfo-list window-params)
+                 :wholep (not subwindow-p)))
 
 (defun wlf:layout-internal (wset)
   "[internal] Lay out windows and return a management object."
@@ -494,7 +515,7 @@ of a window name and a buffer object (or buffer name)."
 ;;          (:left-max-size 20)
 ;;          folder 
 ;;          (- 
-;;           (:left-size-ratio 0.3)
+;;           (:lower-size-ratio 0.6)
 ;;           summary message))
 ;;        '((:name folder :buffer "*info*")
 ;;          (:name summary :buffer "*Messages*")
