@@ -469,18 +469,21 @@ is nil or deleted, return nil."
        (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))
       (if (window-live-p it) it)))
 
-(defun wlf:set-buffer (wset winfo-name buf)
+(defun wlf:set-buffer (wset winfo-name buf &optional selectp)
   "Set the buffer on the window. WSET is the management object
 which is returned by `wlf:layout'. WINFO-NAME is the window name
 which is defined by the argument of `wlf:layout'. BUF is a buffer
 name or object to show in the window."
-  (let ((winfo 
-         (wlf:get-winfo 
-          winfo-name (wlf:wset-winfo-list wset))))
+  (let* ((winfo 
+          (wlf:get-winfo 
+           winfo-name (wlf:wset-winfo-list wset)))
+         (window (wlf:window-window winfo)))
     (plist-put (wlf:window-options winfo) :buffer buf)
-    (wlf:aif (wlf:window-window winfo)
-        (select-window it)) ; 
-    (switch-to-buffer buf)))
+    (when window
+      (with-selected-window window
+        (switch-to-buffer buf))
+      (when selectp 
+        (select-window window)))))
 
 (defun wlf:get-buffer (wset winfo-name)
   "Return the buffer object on the window.
