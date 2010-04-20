@@ -293,14 +293,14 @@ start dividing."
           (switch-to-buffer (get-buffer it))))
     ))
 
-(defun wlf:revert-window-size (winfo-list)
+(defun wlf:restore-window-sizes (winfo-list)
+  "[internal] Restore the window sizes those are modified by the user."
   (loop for winfo in winfo-list
         for win = (wlf:window-window winfo)
         do
         (when (and (wlf:window-shown-p winfo)
                    (null (wlf:window-option-get winfo :fix-size))
                    (wlf:window-last-size winfo))
-          ;; revert size
           (wlf:window-resize
            (wlf:window-window winfo) 
            (wlf:window-vertical winfo)
@@ -388,7 +388,7 @@ layout. See the comment of `wlf:layout' function for arguments."
       (wlf:save-current-window-sizes recipe winfo-list)
       (select-window (wlf:clear-windows winfo-list wholep))
       (wlf:build-windows-rec recipe winfo-list)
-      (wlf:revert-window-size winfo-list)
+      (wlf:restore-window-sizes winfo-list)
       (setq val (make-wlf:wset :recipe recipe 
                                :winfo-list winfo-list
                                :wholep wholep))
