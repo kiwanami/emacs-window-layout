@@ -291,14 +291,20 @@ start dividing."
     (wlf:aif (wlf:window-option-get winfo :buffer)
         (when (buffer-live-p (get-buffer it))
           (switch-to-buffer (get-buffer it))))
-    ;; apply size
-    (when (and (null (wlf:window-option-get winfo :fix-size))
-               (wlf:window-last-size winfo))
-      ;; revert size
-      (wlf:window-resize
-       (wlf:window-window winfo) 
-       (wlf:window-vertical winfo)
-       (wlf:window-last-size winfo)))))
+    ))
+
+(defun wlf:revert-window-size (winfo-list)
+  (loop for winfo in winfo-list
+        for win = (wlf:window-window winfo)
+        do
+        (when (and (wlf:window-shown-p winfo)
+                   (null (wlf:window-option-get winfo :fix-size))
+                   (wlf:window-last-size winfo))
+          ;; revert size
+          (wlf:window-resize
+           (wlf:window-window winfo) 
+           (wlf:window-vertical winfo)
+           (wlf:window-last-size winfo)))))
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
@@ -382,6 +388,7 @@ layout. See the comment of `wlf:layout' function for arguments."
       (wlf:save-current-window-sizes recipe winfo-list)
       (select-window (wlf:clear-windows winfo-list wholep))
       (wlf:build-windows-rec recipe winfo-list)
+      (wlf:revert-window-size winfo-list)
       (setq val (make-wlf:wset :recipe recipe 
                                :winfo-list winfo-list
                                :wholep wholep))
@@ -478,6 +485,7 @@ name or object to show in the window."
           (wlf:get-winfo 
            winfo-name (wlf:wset-winfo-list wset)))
          (window (wlf:window-window winfo)))
+    (unless buf (error "Buffer is null! at wlf:set-buffer. (%s)" winfo-name))
     (plist-put (wlf:window-options winfo) :buffer buf)
     (when window
       (with-selected-window window
@@ -514,11 +522,9 @@ of a window name and a buffer object (or buffer name)."
 
 ;; (setq ss
 ;;       (wlf:layout
-;;        '(|
-;;          (:left-max-size 20)
+;;        '(| (:left-max-size 20)
 ;;          folder 
-;;          (- 
-;;           (:lower-size-ratio 0.6)
+;;          (- (:lower-size-ratio 0.6)
 ;;           summary message))
 ;;        '((:name folder :buffer "*info*")
 ;;          (:name summary :buffer "*Messages*")
@@ -526,15 +532,28 @@ of a window name and a buffer object (or buffer name)."
 
 ;; (setq dd
 ;;       (wlf:no-layout
-;;        '(| 
-;;          (:left-size-ratio 0.33)
+;;        '(| (:left-size-ratio 0.33)
 ;;          folder 
-;;          (| 
-;;           (:left-size-ratio 0.5)
+;;          (| (:left-size-ratio 0.5)
 ;;           summary message))
 ;;        '((:name folder :buffer "*info*")
 ;;          (:name summary :buffer "*Messages*")
 ;;          (:name message :buffer "window-layout.el"))))
+
+;; (setq ff (wlf:no-layout
+;;           '(| (:left-max-size 40)
+;;               (- (:upper-size-ratio 0.25)
+;;                  files
+;;                  (- (:upper-size-ratio 0.3)
+;;                     history sub))
+;;               (| (:right-max-size 30)
+;;                  main imenu))
+;;           '((:name main :buffer "window-layout.el")
+;;             (:name files :buffer "*scratch*")
+;;             (:name history :buffer "*Messages*")
+;;             (:name sub :buffer "*Info*")
+;;             (:name imenu :buffer "*info*" :default-hide t))))
+
 
 ;; (wlf:show ss 'folder)
 ;; (wlf:hide ss 'folder)
@@ -544,6 +563,7 @@ of a window name and a buffer object (or buffer name)."
 ;; (wlf:set-buffer ss 'message "*scratch*")
 ;; (wlf:refresh ss)
 ;; (wlf:refresh dd)
+;; (wlf:refresh ff)
 
 ;; (wlf:wopts-replace-buffer 
 ;;  '((:name folder :buffer "*info*" :max-size 20)
