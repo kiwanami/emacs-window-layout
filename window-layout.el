@@ -158,6 +158,12 @@
   (setf (wlf:window-shown winfo)
         (if (wlf:window-shown-p winfo) 'hide 'show)))
 
+(defun wlf:window-live-p (winfo)
+  "[interna] Return t, if the window is not null and alive."
+  (and (wlf:window-shown-p winfo)
+       (wlf:window-window winfo)
+       (window-live-p (wlf:window-window winfo))))
+
 (defun wlf:window-size (winfo)
   "[internal] Return current window size."
   (let ((window (wlf:window-window winfo)))
@@ -324,23 +330,25 @@ Return a cons cell, car is width and cdr is height."
 (defun wlf:restore-window-sizes (winfo-list)
   "[internal] Restore the window sizes those are modified by the user."
   ;;checking window layout modification
-  (let* ((last-size (wlf:calculate-last-window-sizes winfo-list))
-         (init-size (wlf:calculate-init-window-sizes winfo-list))
-         (width-remainp  (eql (car last-size) (car init-size)))
-         (height-remainp (eql (cdr last-size) (cdr init-size))))
+  (let* ((init-size (wlf:calculate-init-window-sizes winfo-list))
+         (last-size (wlf:calculate-last-window-sizes winfo-list))
+         (total-width (car init-size))
+         (total-height (cdr init-size))
+         (width-remainp  (eql (car last-size) total-width))
+         (height-remainp (eql (cdr last-size) total-height)))
     ;;restore window size
     (loop for winfo in winfo-list
           for win = (wlf:window-window winfo)
+          for last-size = (wlf:window-last-size winfo)
+          for verticalp = (wlf:window-vertical winfo)
           do
           (when (and (wlf:window-shown-p winfo)
                      (null (wlf:window-option-get winfo :fix-size))
-                     (wlf:window-last-size winfo)
-                     (if (wlf:window-vertical winfo)
-                         height-remainp width-remainp))
-            (wlf:window-resize
-             (wlf:window-window winfo) 
-             (wlf:window-vertical winfo)
-             (wlf:window-last-size winfo))))))
+                     last-size
+                     (if verticalp
+                         (and height-remainp (not (eql last-size total-height)))
+                       (and width-remainp (not (eql last-size total-width)))))
+            (wlf:window-resize win verticalp last-size)))))
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
@@ -474,30 +482,36 @@ is returned by `wlf:layout'."
         do (setf (wlf:window-last-size winfo) nil))
   (wlf:layout-internal wset t))
 
-(defun wlf:show (wset winfo-name)
+(defun wlf:show (wset &rest winfo-names)
   "Display the window. WSET is the management object which is
 returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (wlf:window-shown-set 
-   (wlf:get-winfo
-    winfo-name (wlf:wset-winfo-list wset)) t)
+  (loop for wn in winfo-names
+        do
+        (wlf:window-shown-set 
+         (wlf:get-winfo
+          wn (wlf:wset-winfo-list wset)) t))
   (wlf:layout-internal wset))
 
-(defun wlf:hide (wset winfo-name) 
+(defun wlf:hide (wset &rest winfo-names) 
   "Hide the window. WSET is the management object which
 is returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (wlf:window-shown-set
-   (wlf:get-winfo 
-    winfo-name (wlf:wset-winfo-list wset)) nil)
+  (loop for wn in winfo-names
+        do
+        (wlf:window-shown-set
+         (wlf:get-winfo 
+          wn (wlf:wset-winfo-list wset)) nil))
   (wlf:layout-internal wset))
 
-(defun wlf:toggle (wset winfo-name)
+(defun wlf:toggle (wset &rest winfo-names)
   "Toggle the window. WSET is the management object which
 is returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (wlf:window-shown-toggle
-   (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))
+  (loop for wn in winfo-names
+        do
+        (wlf:window-shown-toggle
+         (wlf:get-winfo wn (wlf:wset-winfo-list wset))))
   (wlf:layout-internal wset))
 
 (defun wlf:select (wset winfo-name)
@@ -603,7 +617,9 @@ of a window name and a buffer object (or buffer name)."
 
 ;; (wlf:show ss 'folder)
 ;; (wlf:hide ss 'folder)
-;; (wlf:toggle ss 'folder)
+;; (wlf:toggle ss 'folder 'summary)
+;; (wlf:toggle ss 'summary)
+;; (wlf:reset-window-sizes ss)
 ;; (wlf:select ss 'summary)
 ;; (wlf:get-buffer ss 'message)
 ;; (wlf:set-buffer ss 'message "*scratch*")
