@@ -293,18 +293,54 @@ start dividing."
           (switch-to-buffer (get-buffer it))))
     ))
 
+(defun wlf:calculate-last-window-sizes (winfo-list)
+  "[internal] Calculate summations of the last window size: width and height.
+Return a cons cell, car is width and cdr is height."
+  (loop for winfo in winfo-list
+        with width = 0 with height = 0
+        for size = (wlf:window-last-size winfo)
+        if size
+        do (cond
+            ((wlf:window-vertical winfo)
+             (incf height size))
+            (t
+             (incf width size)))
+        finally return (cons width height)))
+
+(defun wlf:calculate-init-window-sizes (winfo-list)
+  "[internal] Calculate summations of the initial window size: width and height.
+Return a cons cell, car is width and cdr is height."
+  (loop for winfo in winfo-list
+        with width = 0 with height = 0
+        for win = (wlf:window-window winfo)
+        if (and win (window-live-p win))
+        do (cond
+            ((wlf:window-vertical winfo)
+             (incf height (window-height win)))
+            (t
+             (incf width (window-width win))))
+        finally return (cons width height)))
+
 (defun wlf:restore-window-sizes (winfo-list)
   "[internal] Restore the window sizes those are modified by the user."
-  (loop for winfo in winfo-list
-        for win = (wlf:window-window winfo)
-        do
-        (when (and (wlf:window-shown-p winfo)
-                   (null (wlf:window-option-get winfo :fix-size))
-                   (wlf:window-last-size winfo))
-          (wlf:window-resize
-           (wlf:window-window winfo) 
-           (wlf:window-vertical winfo)
-           (wlf:window-last-size winfo)))))
+  ;;checking window layout modification
+  (let* ((last-size (wlf:calculate-last-window-sizes winfo-list))
+         (init-size (wlf:calculate-init-window-sizes winfo-list))
+         (width-remainp  (eql (car last-size) (car init-size)))
+         (height-remainp (eql (cdr last-size) (cdr init-size))))
+    ;;restore window size
+    (loop for winfo in winfo-list
+          for win = (wlf:window-window winfo)
+          do
+          (when (and (wlf:window-shown-p winfo)
+                     (null (wlf:window-option-get winfo :fix-size))
+                     (wlf:window-last-size winfo)
+                     (if (wlf:window-vertical winfo)
+                         height-remainp width-remainp))
+            (wlf:window-resize
+             (wlf:window-window winfo) 
+             (wlf:window-vertical winfo)
+             (wlf:window-last-size winfo))))))
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
@@ -381,14 +417,17 @@ layout. See the comment of `wlf:layout' function for arguments."
                  :winfo-list (wlf:make-winfo-list window-params)
                  :wholep (not subwindow-p)))
 
-(defun wlf:layout-internal (wset)
-  "[internal] Lay out windows and return a management object."
+(defun wlf:layout-internal (wset &optional restore-window-size)
+  "[internal] Lay out windows and return a management object.
+If RESTORE-WINDOW-SIZE is not nil, this function does not restore
+the current window size which can be modified by users."
   (wlf:with-wset wset
     (let ((last-buffer (current-buffer)) val)
       (wlf:save-current-window-sizes recipe winfo-list)
       (select-window (wlf:clear-windows winfo-list wholep))
       (wlf:build-windows-rec recipe winfo-list)
-      (wlf:restore-window-sizes winfo-list)
+      (unless restore-window-size
+        (wlf:restore-window-sizes winfo-list))
       (setq val (make-wlf:wset :recipe recipe 
                                :winfo-list winfo-list
                                :wholep wholep))
@@ -428,6 +467,12 @@ The function FUNC should have one argument : wset object."
   "Refresh the window layout. WSET is a management object which
 is returned by `wlf:layout'."
   (wlf:layout-internal wset))
+
+(defun wlf:reset-window-sizes (wset)
+  "Reset the window size by window recipe parameters."
+  (loop for winfo in (wlf:wset-winfo-list wset)
+        do (setf (wlf:window-last-size winfo) nil))
+  (wlf:layout-internal wset t))
 
 (defun wlf:show (wset winfo-name)
   "Display the window. WSET is the management object which is
@@ -565,6 +610,8 @@ of a window name and a buffer object (or buffer name)."
 ;; (wlf:refresh ss)
 ;; (wlf:refresh dd)
 ;; (wlf:refresh ff)
+;; (wlf:toggle ff 'imenu)
+;; (wlf:reset-window-sizes ff)
 
 ;; (wlf:wopts-replace-buffer 
 ;;  '((:name folder :buffer "*info*" :max-size 20)
