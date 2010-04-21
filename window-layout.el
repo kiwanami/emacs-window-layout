@@ -491,7 +491,8 @@ name or object to show in the window."
       (with-selected-window window
         (switch-to-buffer buf))
       (when selectp 
-        (select-window window)))))
+        (select-window window)))
+    window))
 
 (defun wlf:get-buffer (wset winfo-name)
   "Return the buffer object on the window.
