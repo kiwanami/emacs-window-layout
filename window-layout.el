@@ -105,7 +105,7 @@
 
 ;; * Layout hook
 
-;; When splitting windows, registered hook are called with one
+;; After splitting windows, registered hook are called with one
 ;; argument, the window management object. 
 
 ;;; Code:
@@ -158,11 +158,12 @@
   (setf (wlf:window-shown winfo)
         (if (wlf:window-shown-p winfo) 'hide 'show)))
 
-(defun wlf:window-live-p (winfo)
-  "[interna] Return t, if the window is not null and alive."
-  (and (wlf:window-shown-p winfo)
-       (wlf:window-window winfo)
-       (window-live-p (wlf:window-window winfo))))
+(defun wlf:window-live-window (winfo)
+  "[internal] Return a window object if the window is not null and
+alive, return nil otherwise."
+  (let ((win (wlf:window-window winfo)))
+    (if (and (wlf:window-shown-p winfo) win
+             (window-live-p win)) win nil)))
 
 (defun wlf:window-size (winfo)
   "[internal] Return current window size."
@@ -187,8 +188,8 @@ start dividing."
    (t      ; nested windows
     (let ((wins 
            (loop for i in winfo-list
-                 for win = (wlf:window-window i)
-                 if (and win (window-live-p win))
+                 for win = (wlf:window-live-window i)
+                 if win
                  collect win)))
       (if (> (length wins) 1)
           (loop for w in (cdr wins)
@@ -318,8 +319,8 @@ Return a cons cell, car is width and cdr is height."
 Return a cons cell, car is width and cdr is height."
   (loop for winfo in winfo-list
         with width = 0 with height = 0
-        for win = (wlf:window-window winfo)
-        if (and win (window-live-p win))
+        for win = (wlf:window-live-window winfo)
+        if win
         do (cond
             ((wlf:window-vertical winfo)
              (incf height (window-height win)))
@@ -403,8 +404,7 @@ Return a cons cell, car is width and cdr is height."
    (if (equal recipe it)
        (loop for winfo in winfo-list
              do (setf (wlf:window-last-size winfo)
-                      (if (and (wlf:window-window winfo) 
-                               (window-live-p (wlf:window-window winfo)))
+                      (if (wlf:window-live-window winfo) 
                           (wlf:window-size winfo) nil)))))
   (set-frame-parameter (selected-frame) 'wlf:recipe recipe))
 
@@ -520,20 +520,17 @@ which is returned by `wlf:layout'. WINFO-NAME is the window name
 which is defined by the argument of `wlf:layout'. If the window
 is nil or deleted, no window is selected."
   (wlf:aif 
-      (wlf:window-window
+      (wlf:window-live-window
        (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))
-      (if (window-live-p it)
-        (select-window it))))
+      (select-window it)))
 
 (defun wlf:get-window (wset winfo-name)
   "Return the indicated window. WSET is the management object
 which is returned by `wlf:layout'. WINFO-NAME is the window name
 which is defined by the argument of `wlf:layout'. If the window
 is nil or deleted, return nil."
-  (wlf:aif
-      (wlf:window-window
-       (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)))
-      (if (window-live-p it) it)))
+  (wlf:window-live-window 
+   (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset))))
 
 (defun wlf:set-buffer (wset winfo-name buf &optional selectp)
   "Set the buffer on the window. WSET is the management object
