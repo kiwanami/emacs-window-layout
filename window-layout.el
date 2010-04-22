@@ -183,8 +183,8 @@ alive, return nil otherwise."
 start dividing."
   (cond 
    (wholep ; using the whole area 
-    (delete-other-windows)
-    (selected-window))
+    (delete-other-windows (get-largest-window))
+    (get-largest-window))
    (t      ; nested windows
     (let ((wins 
            (loop for i in winfo-list
