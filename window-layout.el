@@ -339,17 +339,16 @@ Return a cons cell, car is width and cdr is height."
          (height-remainp (eql (cdr last-size) total-height)))
     ;;restore window size
     (loop for winfo in winfo-list
-          for win = (wlf:window-window winfo)
-          for last-size = (wlf:window-last-size winfo)
+          for win = (wlf:window-live-window winfo)
+          for to-size = (wlf:window-last-size winfo)
           for verticalp = (wlf:window-vertical winfo)
           do
-          (when (and (wlf:window-shown-p winfo)
+          (when (and win to-size
                      (null (wlf:window-option-get winfo :fix-size))
-                     last-size
                      (if verticalp
-                         (and height-remainp (not (eql last-size total-height)))
-                       (and width-remainp (not (eql last-size total-width)))))
-            (wlf:window-resize win verticalp last-size)))))
+                         (and height-remainp (not (eql to-size total-height)))
+                       (and width-remainp (not (eql to-size total-width)))))
+            (wlf:window-resize win verticalp to-size)))))
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
@@ -540,7 +539,7 @@ name or object to show in the window."
   (let* ((winfo 
           (wlf:get-winfo 
            winfo-name (wlf:wset-winfo-list wset)))
-         (window (wlf:window-window winfo)))
+         (window (wlf:window-live-window winfo)))
     (unless buf (error "Buffer is null! at wlf:set-buffer. (%s)" winfo-name))
     (plist-put (wlf:window-options winfo) :buffer buf)
     (when window
