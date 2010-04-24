@@ -42,17 +42,24 @@
 ;;          (:name 'message
 ;;           :buffer "message buffer")
 ;;         )))
-;;
+
 ;; ;; Window controlling
 ;; (wlf:show    wm 'summary)
 ;; (wlf:hide    wm 'summary)
 ;; (wlf:toggle  wm 'summary)
 ;; (wlf:select  wm 'summary)
+
+;; ;; Window updating
 ;; (wlf:refresh wm)
-;;
-;; ;; Accessing the buffer
+;; (wlf:reset-window-sizes wm)
+;; (wlf:reset-init wm)
+
+;; ;; Accessing a buffer
 ;; (wlf:get-buffer wm 'summary) -> <#buffer object>
 ;; (wlf:set-buffer wm 'summary "*scratch*")
+
+;; ;; Accessing a window
+;; (wlf:get-window wm 'summary)
 
 ;; ;; Layout hook
 ;; (defun wlf:test-hook (wset) (message "HOOK : %s" wset))
@@ -395,7 +402,8 @@ Return a cons cell, car is width and cdr is height."
             (wlf:translate-recipe (cadr recipe-nodes))))))
 
 (defun wlf:save-current-window-sizes (recipe winfo-list)
-  "[internal] Save current window sizes, before clearing the windows."
+  "[internal] Save current window sizes, before clearing the
+windows. The saved sizes are used at `wlf:restore-window-sizes'."
   (loop for winfo in winfo-list
         do (setf (wlf:window-last-size winfo) nil))
   (wlf:aif
@@ -476,9 +484,13 @@ is returned by `wlf:layout'."
   (wlf:layout-internal wset))
 
 (defun wlf:reset-window-sizes (wset)
-  "Reset the window size by window recipe parameters."
+  "Reset the window sizes by window recipe parameters."
+  (wlf:layout-internal wset t))
+
+(defun wlf:reset-init (wset)
+  "Reset the window sizes and display statuses by window recipe parameters."
   (loop for winfo in (wlf:wset-winfo-list wset)
-        do (setf (wlf:window-last-size winfo) nil))
+        do (setf (wlf:window-shown winfo) nil))
   (wlf:layout-internal wset t))
 
 (defun wlf:show (wset &rest winfo-names)
@@ -573,6 +585,7 @@ of a window name and a buffer object (or buffer name)."
                return i)
    do (plist-put opts ':buffer buf))
   wopts)
+
 
 ;;; test
 
