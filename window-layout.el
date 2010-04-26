@@ -591,6 +591,25 @@ of a window name and a buffer object (or buffer name)."
    do (plist-put opts ':buffer buf))
   wopts)
 
+(defun wlf:copy-windows (wset)
+  "Return a copied wset object for `set-window-configuration' hacking."
+  (make-wlf:wset 
+   :recipe (wlf:wset-recipe wset)
+   :winfo-list (loop for i in (wlf:wset-winfo-list wset)
+                     collect (wlf:copy-winfo i))
+   :wholep (wlf:wset-wholep wset)
+   :layout-hook (wlf:wset-layout-hook wset)))
+
+(defun wlf:copy-winfo (winfo)
+  "[internal] Return a shallow copied window object."
+  (make-wlf:window
+   :name (wlf:window-name winfo)
+   :options (wlf:window-options winfo)
+   :shown (wlf:window-shown winfo)
+   :window (wlf:window-window winfo)
+   :vertical (wlf:window-vertical winfo)
+   :last-size (wlf:window-last-size winfo)))
+
 
 ;;; test
 
@@ -644,8 +663,8 @@ of a window name and a buffer object (or buffer name)."
 ;; (wlf:reset-window-sizes ff)
 
 ;; (wlf:wopts-replace-buffer 
-;;  '((:name folder :buffer "*info*" :max-size 20)
-;;    (:name summary :buffer "*Messages*" :max-size 10)
+;;  '((:name folder :buffer "*info*")
+;;    (:name summary :buffer "*Messages*")
 ;;    (:name message :buffer "window-layout.el" :default-hide nil))
 ;;  '((folder . "*Messages*") (summary . "*scratch*")))
 
