@@ -48,6 +48,7 @@
 ;; (wlf:hide    wm 'summary)
 ;; (wlf:toggle  wm 'summary)
 ;; (wlf:select  wm 'summary)
+;; (wlf:toggle-maximize  wm 'summary)
 
 ;; ;; Window updating
 ;; (wlf:refresh wm)
@@ -436,6 +437,7 @@ layout. See the comment of `wlf:layout' function for arguments."
   "[internal] Lay out windows and return a management object.
 If RESTORE-WINDOW-SIZE is not nil, this function does not restore
 the current window size which can be modified by users."
+  (wlf:maximize-info-clear)
   (wlf:with-wset wset
     (let ((last-buffer (current-buffer)) val)
       (wlf:save-current-window-sizes recipe winfo-list)
@@ -610,6 +612,63 @@ of a window name and a buffer object (or buffer name)."
    :vertical (wlf:window-vertical winfo)
    :last-size (wlf:window-last-size winfo)))
 
+(defun wlf:maximize-info-get ()
+  "Return toggle-maximize info."
+  (frame-parameter (selected-frame) 'wlf:maximize))
+
+(defun wlf:maximize-info-set (val)
+  "Set toggle-maximize info."
+  (set-frame-parameter (selected-frame) 'wlf:maximize val))
+
+(defun wlf:maximize-info-clear ()
+  "Clear toggle-maximize info."
+  (wlf:maximize-info-set nil))
+
+(defun wlf:collect-window-states (wset)
+  "[internal] Collect current window states."
+  (loop for winfo in (wlf:wset-winfo-list wset)
+        collect (cons (wlf:window-name winfo)
+                      (wlf:window-shown-p winfo))))
+
+(defun wlf:revert-window-states (wset states)
+  "[internal] Revert window states whose are collected by
+`wlf:collect-window-states'."
+  (loop for s in states
+        with winfo-list = (wlf:wset-winfo-list wset)
+        for wname = (car s)
+        for winfo = (wlf:get-winfo wname winfo-list)
+        do (wlf:window-shown-set winfo (cdr s))))
+
+(defun wlf:maximize-window-states (wset winfo-name)
+  "[internal] Set show state at the WINFO-NAME window, set hide
+state at the other windows."
+  (loop for winfo in (wlf:wset-winfo-list wset)
+        if (eq (wlf:window-name winfo) winfo-name)
+        do (wlf:window-shown-set winfo t)
+        else
+        do (wlf:window-shown-set winfo nil)))
+
+(defun wlf:toggle-maximize (wset winfo-name)
+  "Toggle WINFO-NAME window maximizing."
+  ;; structure : (wlf:maximize maximized-winfo-name states-list)
+  (let ((prev-states (wlf:maximize-info-get))
+        (current-states (wlf:collect-window-states wset))
+        next-states)
+    (cond
+     (prev-states ; now maximizing
+      (cond
+       ((eq winfo-name (cadr prev-states)) ; revert windows
+        (wlf:revert-window-states wset (caddr prev-states)))
+       (t ; maximize other window
+        (setf (cadr prev-states) winfo-name)
+        (setq next-states prev-states)
+        (wlf:maximize-window-states wset winfo-name))))
+     (t ; maximize a window
+      (wlf:maximize-window-states wset winfo-name)
+      (setq next-states
+            (list 'wlf:maximize winfo-name current-states))))
+    (wlf:layout-internal wset)
+    (wlf:maximize-info-set next-states)))
 
 ;;; test
 
@@ -650,6 +709,8 @@ of a window name and a buffer object (or buffer name)."
 
 ;; (wlf:show ss 'folder)
 ;; (wlf:hide ss 'folder)
+;; (wlf:toggle-maximize ss 'message)
+;; (wlf:toggle-maximize ss 'folder)
 ;; (wlf:toggle ss 'folder 'summary)
 ;; (wlf:toggle ss 'summary)
 ;; (wlf:reset-window-sizes ss)
