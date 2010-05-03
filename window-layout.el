@@ -577,6 +577,17 @@ the argument of `wlf:layout'."
   (wlf:window-option-get 
    (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)) :buffer))
 
+(defun wlf:window-name-p (wset winfo-name)
+  "Return t if WINFO-NAME exists in WSET. Otherwise return nil."
+  (if (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset)) t
+    nil))
+
+(defun wlf:window-displayed-p (wset winfo-name)
+  "Return t if the window of WINFO-NAME is displayed. Otherwise return nil."
+  (wlf:aif (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset))
+      (wlf:window-shown-p it)
+    nil))
+
 (defun wlf:wopts-replace-buffer (wopts buffer-alist)
   "Helper function for the argument of `wlf:layout'. This
 function replaces or adds buffer objects in the window options.
