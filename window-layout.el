@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2010  SAKURAI Masashi
 
-;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
+;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
 ;; Version: 1.0
 ;; Keywords: window, layout
 
@@ -305,8 +305,7 @@ start dividing."
       (delete-window (selected-window))
     (wlf:aif (wlf:window-option-get winfo :buffer)
         (when (buffer-live-p (get-buffer it))
-          (switch-to-buffer (get-buffer it))))
-    ))
+          (set-window-buffer (selected-window) (get-buffer it))))))
 
 (defun wlf:calculate-last-window-sizes (winfo-list)
   "[internal] Calculate summations of the last window size: width and height.
@@ -562,8 +561,7 @@ name or object to show in the window."
     (unless buf (error "Buffer is null! at wlf:set-buffer. (%s)" winfo-name))
     (plist-put (wlf:window-options winfo) :buffer buf)
     (when window
-      (with-selected-window window
-        (switch-to-buffer buf))
+      (set-window-buffer window buf)
       (when selectp 
         (select-window window)))
     window))
