@@ -622,15 +622,15 @@ of a window name and a buffer object (or buffer name)."
    :last-size (wlf:window-last-size winfo)))
 
 (defun wlf:maximize-info-get ()
-  "Return toggle-maximize info."
+  "[internal] Return toggle-maximize info."
   (frame-parameter (selected-frame) 'wlf:maximize))
 
 (defun wlf:maximize-info-set (val)
-  "Set toggle-maximize info."
+  "[internal] Set toggle-maximize info."
   (set-frame-parameter (selected-frame) 'wlf:maximize val))
 
 (defun wlf:maximize-info-clear ()
-  "Clear toggle-maximize info."
+  "[internal] Clear toggle-maximize info."
   (wlf:maximize-info-set nil))
 
 (defun wlf:collect-window-states (wset)
@@ -678,6 +678,42 @@ state at the other windows."
             (list 'wlf:maximize winfo-name current-states))))
     (wlf:layout-internal wset)
     (wlf:maximize-info-set next-states)))
+
+(defun wlf:get-window-name (wset window)
+  "Return the window name that is corresponding to the WINDOW object.
+If the WINDOW is not found, return nil."
+  (loop for winfo in (wlf:wset-winfo-list wset)
+        for win = (wlf:window-window winfo)
+        if (and win (window-live-p win)
+                (eql win window))
+        return (wlf:window-name winfo)))
+
+(defun wlf:wset-live-p (wset &optional fit-count)
+  "Return t if all shown windows live, return nil otherwise.
+FIT-COUNT is nil or positive integer. If the number of not alive
+windows is greater than FIT-COUNT, this function return
+nil. Otherwise, return t and set 'hide' at the shown parameter of
+the not alive windows."
+  (let ((die-count 0) (shown-count 0))
+    (loop for winfo in (wlf:wset-winfo-list wset)
+          for win = (wlf:window-window winfo)
+          if (wlf:window-shown-p winfo)
+          do 
+          (incf shown-count)
+          (unless (and win (window-live-p win))
+            (incf die-count)))
+    (cond
+     ((and fit-count (numberp fit-count))
+      (if (< fit-count die-count) nil
+        (loop for winfo in (wlf:wset-winfo-list wset)
+              for win = (wlf:window-window winfo)
+              if (wlf:window-shown-p winfo)
+              do 
+              (unless (and win (window-live-p win))
+                (wlf:window-shown-set winfo nil)))
+        nil))
+     (t
+      (= die-count 0)))))
 
 ;;; test
 
@@ -731,6 +767,10 @@ state at the other windows."
 ;; (wlf:refresh ff)
 ;; (wlf:toggle ff 'imenu)
 ;; (wlf:reset-window-sizes ff)
+
+;; (wlf:get-window-name ss (selected-window))
+;; (wlf:wset-live-p ss)
+;; (wlf:wset-live-p ss 1)
 
 ;; (wlf:wopts-replace-buffer 
 ;;  '((:name folder :buffer "*info*")
