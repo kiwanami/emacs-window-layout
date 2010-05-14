@@ -703,6 +703,7 @@ the not alive windows."
           (unless (and win (window-live-p win))
             (incf die-count)))
     (cond
+     ((= die-count 0) t)
      ((and fit-count (numberp fit-count))
       (if (< fit-count die-count) nil
         (loop for winfo in (wlf:wset-winfo-list wset)
@@ -711,9 +712,9 @@ the not alive windows."
               do 
               (unless (and win (window-live-p win))
                 (wlf:window-shown-set winfo nil)))
-        nil))
+        t))
      (t
-      (= die-count 0)))))
+      nil))))
 
 ;;; test
 
