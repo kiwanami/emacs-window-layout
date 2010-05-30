@@ -432,6 +432,15 @@ layout. See the comment of `wlf:layout' function for arguments."
                  :winfo-list (wlf:make-winfo-list window-params)
                  :wholep (not subwindow-p)))
 
+(defmacro wlf:with-wset (wset &rest body)
+  (declare (indent 1))
+  `(let* 
+       ((recipe (wlf:wset-recipe wset))
+        (winfo-list (wlf:wset-winfo-list wset))
+        (wholep (wlf:wset-wholep wset))
+        (layout-hook (wlf:wset-layout-hook wset)))
+     ,@body))
+
 (defun wlf:layout-internal (wset &optional restore-window-size)
   "[internal] Lay out windows and return a management object.
 If RESTORE-WINDOW-SIZE is not nil, this function does not restore
@@ -454,15 +463,6 @@ the current window size which can be modified by users."
       (wlf:aif (get-buffer-window last-buffer)
           (select-window it))
       val)))
-
-(defmacro wlf:with-wset (wset &rest body)
-  (declare (indent 1))
-  `(let* 
-       ((recipe (wlf:wset-recipe wset))
-        (winfo-list (wlf:wset-winfo-list wset))
-        (wholep (wlf:wset-wholep wset))
-        (layout-hook (wlf:wset-layout-hook wset)))
-     ,@body))
 
 (defun wlf:layout-hook-add (wset func)
   "Add FUNC to layout-hook of the WSET, and return the layout-hook. 
