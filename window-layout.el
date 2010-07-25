@@ -121,11 +121,13 @@
 (eval-when-compile (require 'cl))
 
 (defmacro wlf:aif (test-form then-form &rest else-forms)
+  (declare (debug ("test-form" form "then-form" form &rest form))
+           (indent 2))
   `(let ((it ,test-form))
      (if it ,then-form ,@else-forms)))
-(put 'wlf:aif 'lisp-indent-function 2)
 
 (defmacro wlf:acond (&rest clauses)
+  (declare (debug (&rest form)))
   (if (null clauses) nil
     (let ((cl1 (car clauses))
           (sym (gensym)))
@@ -433,7 +435,8 @@ layout. See the comment of `wlf:layout' function for arguments."
                  :wholep (not subwindow-p)))
 
 (defmacro wlf:with-wset (wset &rest body)
-  (declare (indent 1))
+  (declare (debug ("wset" sexp &rest form))
+           (indent 1))
   `(let* 
        ((recipe (wlf:wset-recipe wset))
         (winfo-list (wlf:wset-winfo-list wset))
@@ -751,7 +754,6 @@ the not alive windows."
 ;;             (:name history :buffer "*Messages*")
 ;;             (:name sub :buffer "*Info*")
 ;;             (:name imenu :buffer "*info*" :default-hide t))))
-
 
 ;; (wlf:show ss 'folder)
 ;; (wlf:hide ss 'folder)
