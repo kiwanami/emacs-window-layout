@@ -166,7 +166,9 @@
 (defun wlf:window-shown-toggle (winfo)
   "[internal] Toggle window displaying state."
   (setf (wlf:window-shown winfo)
-        (if (wlf:window-shown-p winfo) 'hide 'show)))
+        (if (and (wlf:window-shown-p winfo) 
+                 (wlf:window-live-window winfo))
+                 'hide 'show)))
 
 (defun wlf:window-live-window (winfo)
   "[internal] Return a window object if the window is not null and
