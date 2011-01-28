@@ -116,6 +116,8 @@
 ;; After splitting windows, registered hook are called with one
 ;; argument, the window management object. 
 
+
+
 ;;; Code:
 
 (eval-when-compile (require 'cl))
@@ -152,8 +154,9 @@
 ;; window    : a window object.
 ;; vertical  : if the window is split vertically, the value is t.
 ;; last-size : if the window is alive, the window size is saved before laying out.
+;; edges     : a list of window edges returned by `window-edges'.
 
-(defstruct wlf:window name options shown window vertical last-size)
+(defstruct wlf:window name options shown window vertical last-size edges)
 
 (defun wlf:window-shown-set (winfo i)
   "[internal] translate the argument: nil -> 'hide / t -> 'show"
@@ -170,12 +173,27 @@
                  (wlf:window-live-window winfo))
                  'hide 'show)))
 
+(defun wlf:window-window-by-edge (winfo)
+  "[internal] Return a window object which corresponding to WINFO.
+This function retrieves the window object from the edge position
+in current frame."
+  (and (wlf:window-edges winfo)
+       (destructuring-bind
+           (left top right bottom) (wlf:window-edges winfo)
+         (let ((swin (window-at left top)))
+           (and swin 
+                (destructuring-bind
+                    (sl st sr sb) (window-edges swin)
+                  (if (and (equal left sl) (equal top st)) t
+                    (message "OLD:%S  NEW:%S"
+                             (wlf:window-edges winfo) (window-edges swin)) nil))
+                swin)))))
+
 (defun wlf:window-live-window (winfo)
   "[internal] Return a window object if the window is not null and
 alive, return nil otherwise."
   (let ((win (wlf:window-window winfo)))
-    (if (and (wlf:window-shown-p winfo) win
-             (window-live-p win)) win nil)))
+    (and (wlf:window-shown-p winfo) win (window-live-p win) win)))
 
 (defun wlf:window-size (winfo)
   "[internal] Return current window size."
@@ -189,6 +207,8 @@ alive, return nil otherwise."
 (defmacro wlf:window-option-get (winfo option-key)
   "[internal] Return an option value from an option property list."
   `(plist-get (wlf:window-options ,winfo) ',option-key))
+
+
 
 (defun wlf:clear-windows (winfo-list wholep)
   "[internal] Destroy windows and return the window object to
@@ -270,17 +290,19 @@ start dividing."
   (let ((size (if verticalp
                   (window-height)
                 (window-width))))
-    (wlf:acond
-     ((plist-get split-options ':max-size)
-      (if (< it size)
-          (wlf:window-shrink (selected-window) 
-                             verticalp (- size it))))
-     ((plist-get split-options ':size)
-      (wlf:window-resize (selected-window) verticalp it))
-     ((plist-get split-options ':size-ratio)
-      (wlf:window-resize 
-       (selected-window) verticalp
-       (truncate (* 2 size it)))))))
+    (condition-case err
+        (wlf:acond
+         ((plist-get split-options ':max-size)
+          (if (< it size)
+              (wlf:window-shrink (selected-window) 
+                                 verticalp (- size it))))
+         ((plist-get split-options ':size)
+          (wlf:window-resize (selected-window) verticalp it))
+         ((plist-get split-options ':size-ratio)
+          (wlf:window-resize 
+           (selected-window) verticalp
+           (truncate (* 2 size it)))))
+      (error (message "wlf:warning : %s" err)))))
 
 (defun wlf:window-shrink (window verticalp shrink-size)
   "[internal] Shrink window size."
@@ -309,7 +331,8 @@ start dividing."
       (delete-window (selected-window))
     (wlf:aif (wlf:window-option-get winfo :buffer)
         (when (buffer-live-p (get-buffer it))
-          (set-window-buffer (selected-window) (get-buffer it))))))
+          (set-window-buffer (selected-window) (get-buffer it))))
+    (setf (wlf:window-edges winfo) (window-edges (selected-window)))))
 
 (defun wlf:calculate-last-window-sizes (winfo-list)
   "[internal] Calculate summations of the last window size: width and height.
@@ -411,13 +434,15 @@ windows. The saved sizes are used at `wlf:restore-window-sizes'."
   (loop for winfo in winfo-list
         do (setf (wlf:window-last-size winfo) nil))
   (wlf:aif
-   (frame-parameter (selected-frame) 'wlf:recipe)
-   (if (equal recipe it)
-       (loop for winfo in winfo-list
-             do (setf (wlf:window-last-size winfo)
-                      (if (wlf:window-live-window winfo) 
-                          (wlf:window-size winfo) nil)))))
+      (frame-parameter (selected-frame) 'wlf:recipe)
+      (if (equal recipe it)
+          (loop for winfo in winfo-list
+                do (setf (wlf:window-last-size winfo)
+                         (if (wlf:window-live-window winfo) 
+                             (wlf:window-size winfo) nil)))))
   (set-frame-parameter (selected-frame) 'wlf:recipe recipe))
+
+
 
 (defun wlf:layout (recipe window-params &optional subwindow-p)
   "Lay out windows and return a management object.
@@ -624,7 +649,8 @@ of a window name and a buffer object (or buffer name)."
    :shown (wlf:window-shown winfo)
    :window (wlf:window-window winfo)
    :vertical (wlf:window-vertical winfo)
-   :last-size (wlf:window-last-size winfo)))
+   :last-size (wlf:window-last-size winfo)
+   :edges (wlf:window-edges winfo)))
 
 (defun wlf:maximize-info-get ()
   "[internal] Return toggle-maximize info."
@@ -693,12 +719,8 @@ If the WINDOW is not found, return nil."
                 (eql win window))
         return (wlf:window-name winfo)))
 
-(defun wlf:wset-live-p (wset &optional fit-count)
-  "Return t if all shown windows live, return nil otherwise.
-FIT-COUNT is nil or positive integer. If the number of not alive
-windows is greater than FIT-COUNT, this function return
-nil. Otherwise, return t and set 'hide' at the shown parameter of
-the not alive windows."
+(defun wlf:wset-live-p (wset)
+  "Return t if WSET is valid, return nil otherwise."
   (let ((die-count 0) (shown-count 0))
     (loop for winfo in (wlf:wset-winfo-list wset)
           for win = (wlf:window-window winfo)
@@ -709,17 +731,43 @@ the not alive windows."
             (incf die-count)))
     (cond
      ((= die-count 0) t)
-     ((and fit-count (numberp fit-count))
-      (if (< fit-count die-count) nil
-        (loop for winfo in (wlf:wset-winfo-list wset)
-              for win = (wlf:window-window winfo)
-              if (wlf:window-shown-p winfo)
-              do 
-              (unless (and win (window-live-p win))
-                (wlf:window-shown-set winfo nil)))
-        t))
-     (t
-      nil))))
+     (t (loop for winfo in (wlf:wset-winfo-list wset)
+              for (left top right bottom) = (wlf:window-edges winfo)
+              for sw = (window-at left top)
+              with windows = nil
+              do
+              (when sw
+                (cond
+                 ((memq sw windows) (return nil))
+                 (t (push sw windows))))
+              finally return t)))))
+
+(defun wlf:wset-fix-windows (wset)
+  (loop for winfo in (wlf:wset-winfo-list wset)
+        for win = (wlf:window-window winfo)
+        do
+        (cond
+         ((wlf:window-shown-p winfo) ; should be displayed
+          (cond
+           (win ; the previous window object exists
+            (let ((swin (wlf:window-window-by-edge winfo)))
+              (cond
+               (swin ; found a window object
+                (setf (wlf:window-window winfo) swin
+                      (wlf:window-edges winfo) (window-edges swin)))
+               (t    ; found no window object
+                (wlf:window-shown-set winfo nil)
+                (setf (wlf:window-window winfo) nil
+                      (wlf:window-edges winfo) nil)))))
+           (t ; no previous window object
+            (wlf:window-shown-set winfo nil)
+            (setf (wlf:window-window winfo) nil
+                  (wlf:window-edges winfo) nil))))
+         (t ; not displayed
+          (setf (wlf:window-window winfo) nil
+                (wlf:window-edges winfo) nil)))))
+
+
 
 ;;; test
 
