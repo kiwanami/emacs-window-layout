@@ -180,7 +180,7 @@ in current frame."
   (and (wlf:window-edges winfo)
        (destructuring-bind
            (left top right bottom) (wlf:window-edges winfo)
-         (let ((swin (window-at left top)))
+         (let ((swin (window-at (+ 2 left) (+ 2 top))))
            (and swin 
                 (destructuring-bind
                     (sl st sr sb) (window-edges swin)
@@ -331,8 +331,16 @@ start dividing."
       (delete-window (selected-window))
     (wlf:aif (wlf:window-option-get winfo :buffer)
         (when (buffer-live-p (get-buffer it))
-          (set-window-buffer (selected-window) (get-buffer it))))
-    (setf (wlf:window-edges winfo) (window-edges (selected-window)))))
+          (set-window-buffer (selected-window) (get-buffer it))))))
+
+(defun wlf:collect-window-edges (winfo-list)
+  "[internal] At the end of window laying out, this function is
+called to collect window edges."
+  (loop for winfo in winfo-list
+        if (wlf:window-live-window winfo)
+        do 
+        (setf (wlf:window-edges winfo)
+              (window-edges (wlf:window-window winfo)))))
 
 (defun wlf:calculate-last-window-sizes (winfo-list)
   "[internal] Calculate summations of the last window size: width and height.
@@ -483,6 +491,7 @@ the current window size which can be modified by users."
       (wlf:build-windows-rec recipe winfo-list)
       (unless restore-window-size
         (wlf:restore-window-sizes winfo-list))
+      (wlf:collect-window-edges winfo-list)
       (setq val (make-wlf:wset :recipe recipe 
                                :winfo-list winfo-list
                                :wholep wholep))
