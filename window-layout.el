@@ -436,6 +436,16 @@ Return a cons cell, car is width and cdr is height."
             (wlf:translate-recipe (car recipe-nodes))
             (wlf:translate-recipe (cadr recipe-nodes))))))
 
+(defun wlf:max-window-size-p (winfo)
+  "[internal] If current window size is equal to the frame
+size (maximum window size), return t. Otherwise return nil."
+  (let ((wsize (wlf:window-size winfo)))
+    (cond
+     ((wlf:window-vertical winfo)
+      (>= wsize (1- (frame-height))))
+     (t
+      (>= wsize (1- (frame-width)))))))
+
 (defun wlf:save-current-window-sizes (recipe winfo-list)
   "[internal] Save current window sizes, before clearing the
 windows. The saved sizes are used at `wlf:restore-window-sizes'."
@@ -444,10 +454,11 @@ windows. The saved sizes are used at `wlf:restore-window-sizes'."
   (wlf:aif
       (frame-parameter (selected-frame) 'wlf:recipe)
       (if (equal recipe it)
-          (loop for winfo in winfo-list
-                do (setf (wlf:window-last-size winfo)
-                         (if (wlf:window-live-window winfo) 
-                             (wlf:window-size winfo) nil)))))
+          (loop for winfo in winfo-list do
+                (setf (wlf:window-last-size winfo)
+                      (and (wlf:window-live-window winfo)
+                           (wlf:max-window-size-p winfo)
+                           (wlf:window-size winfo))))))
   (set-frame-parameter (selected-frame) 'wlf:recipe recipe))
 
 
