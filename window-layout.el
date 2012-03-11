@@ -149,7 +149,7 @@
 
 ;;; Window management structure
 ;; name      : a symbol of the window name.
-;; options   : an option alist given by the recipe.
+;; options   : an option plist given by the recipe.
 ;; shown     : 'show/'hide. if 'hide, the window is not displayed.
 ;; window    : a window object.
 ;; vertical  : if the window is split vertically, the value is t.
