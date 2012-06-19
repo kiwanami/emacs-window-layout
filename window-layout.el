@@ -331,7 +331,9 @@ start dividing."
       (delete-window (selected-window))
     (wlf:aif (wlf:window-option-get winfo :buffer)
         (when (buffer-live-p (get-buffer it))
-          (set-window-buffer (selected-window) (get-buffer it))))))
+          (set-window-buffer (selected-window) (get-buffer it))
+          (wlf:aif (wlf:window-option-get winfo :window-point)
+              (set-window-point (selected-window) it))))))
 
 (defun wlf:collect-window-edges (winfo-list)
   "[internal] At the end of window laying out, this function is
@@ -447,18 +449,22 @@ size (maximum window size), return t. Otherwise return nil."
       (>= wsize (1- (frame-width)))))))
 
 (defun wlf:save-current-window-sizes (recipe winfo-list)
-  "[internal] Save current window sizes, before clearing the
-windows. The saved sizes are used at `wlf:restore-window-sizes'."
+  "[internal] Save current window sizes and points, before clearing
+the windows. The saved sizes are used at `wlf:restore-window-sizes'.
+The saved points are used in `wlf:apply-winfo'."
   (loop for winfo in winfo-list
         do (setf (wlf:window-last-size winfo) nil))
   (wlf:aif
       (frame-parameter (selected-frame) 'wlf:recipe)
       (if (equal recipe it)
           (loop for winfo in winfo-list do
-                (setf (wlf:window-last-size winfo)
-                      (and (wlf:window-live-window winfo)
-                           (wlf:max-window-size-p winfo)
-                           (wlf:window-size winfo))))))
+                (let ((win (wlf:window-live-window winfo)))
+                  (setf (wlf:window-last-size winfo)
+                        (and win
+                             (wlf:max-window-size-p winfo)
+                             (wlf:window-size winfo)))
+                  (plist-put (wlf:window-options winfo)
+                             :window-point (and win (window-point win)))))))
   (set-frame-parameter (selected-frame) 'wlf:recipe recipe))
 
 
@@ -610,6 +616,7 @@ name or object to show in the window."
          (window (wlf:window-live-window winfo)))
     (unless buf (error "Buffer is null! at wlf:set-buffer. (%s)" winfo-name))
     (plist-put (wlf:window-options winfo) :buffer buf)
+    (plist-put (wlf:window-options winfo) :window-point (window-point window))
     (when (and window (not (eql (get-buffer buf) (window-buffer window))))
       (set-window-buffer window buf))
     (when selectp 
