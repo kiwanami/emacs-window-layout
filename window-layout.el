@@ -608,7 +608,8 @@ name or object to show in the window."
           (wlf:get-winfo 
            winfo-name (wlf:wset-winfo-list wset)))
          (window (wlf:window-live-window winfo)))
-    (unless buf (error "Buffer is null! at wlf:set-buffer. (%s)" winfo-name))
+    (unless (buffer-live-p buf)
+      (error "Buffer is dead. at wlf:set-buffer. (%s)" winfo-name))
     (plist-put (wlf:window-options winfo) :buffer buf)
     (when (and window (not (eql (get-buffer buf) (window-buffer window))))
       (set-window-buffer window buf))
