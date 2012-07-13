@@ -604,6 +604,7 @@ programs depend on `wlf:get-window' should watch invocations of
 which is returned by `wlf:layout'. WINFO-NAME is the window name
 which is defined by the argument of `wlf:layout'. BUF is a buffer
 name or object to show in the window."
+  (when (stringp buf) (setq buf (get-buffer buf)))
   (let* ((winfo 
           (wlf:get-winfo 
            winfo-name (wlf:wset-winfo-list wset)))
