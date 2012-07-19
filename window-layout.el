@@ -338,15 +338,16 @@ start dividing."
   "[internal] Apply layout options to the current window."
   (if (not (wlf:window-shown-p winfo))
       (delete-window (selected-window))
-    (wlf:aif (wlf:window-option-get winfo :buffer)
-        (when (buffer-live-p (get-buffer it))
-          (set-window-buffer (selected-window) (get-buffer it))
-          (wlf:aif (wlf:window-option-get winfo :window-first-line-point)
-              (save-excursion
-                (goto-char it)
-                (recenter 0)))
-          (wlf:aif (wlf:window-option-get winfo :window-point)
-              (set-window-point (selected-window) it))))))
+    (let ((buffer (wlf:aif (wlf:window-option-get winfo :buffer)
+                      (get-buffer it))))
+      (when (buffer-live-p buffer)
+        (set-window-buffer (selected-window) buffer)
+        (wlf:aif (wlf:window-option-get winfo :window-first-line-point)
+            (save-excursion
+              (goto-char it)
+              (recenter 0)))
+        (wlf:aif (wlf:window-option-get winfo :window-point)
+            (set-window-point (selected-window) it))))))
 
 (defun wlf:collect-window-edges (winfo-list)
   "[internal] At the end of window laying out, this function is
