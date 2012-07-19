@@ -143,9 +143,10 @@
 of the WINDOW."
   (when (windowp window)
     (with-selected-window window
-      (save-excursion
-        (move-to-window-line 0)
-        (point)))))
+      (with-current-buffer (window-buffer window)
+        (save-excursion
+          (move-to-window-line 0)
+          (point))))))
 
 ;;; Window-set management structure
 ;; recipe      : an input recipe object.
