@@ -343,9 +343,10 @@ start dividing."
       (when (buffer-live-p buffer)
         (set-window-buffer (selected-window) buffer)
         (wlf:aif (wlf:window-option-get winfo :window-first-line-point)
-            (save-excursion
-              (goto-char it)
-              (recenter 0)))
+            (with-current-buffer buffer
+              (save-excursion
+                (goto-char it)
+                (recenter 0))))
         (wlf:aif (wlf:window-option-get winfo :window-point)
             (set-window-point (selected-window) it))))))
 
