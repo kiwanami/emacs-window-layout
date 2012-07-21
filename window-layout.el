@@ -348,7 +348,8 @@ start dividing."
               (goto-char it)
               (recenter 0)))
         (wlf:aif (wlf:window-option-get winfo :window-point)
-            (set-window-point (selected-window) it))))))
+            (with-current-buffer buffer
+              (goto-char it)))))))
 
 (defun wlf:collect-window-edges (winfo-list)
   "[internal] At the end of window laying out, this function is
