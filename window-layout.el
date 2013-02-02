@@ -595,7 +595,11 @@ configuration is applied by `set-window-configuration', this
 function may return nil because the window configured by wlf is
 not alive. Since many functions calls `set-window-configuration',
 programs depend on `wlf:get-window' should watch invocations of
-`set-window-configuration'."
+`set-window-configuration'.
+
+See also `wlf:get-window-name'.  It is approximately the inverse
+function of `wlf:get-window'.  `wlf:get-window-name' converts
+window to window name."
   (wlf:window-live-window 
    (wlf:get-winfo winfo-name (wlf:wset-winfo-list wset))))
 
@@ -732,7 +736,10 @@ state at the other windows."
 
 (defun wlf:get-window-name (wset window)
   "Return the window name that is corresponding to the WINDOW object.
-If the WINDOW is not found, return nil."
+If the WINDOW is not found, return nil.
+
+See also `wlf:get-window'.  It is sort of the inverse function.
+It returns WINDOW by given name."
   (loop for winfo in (wlf:wset-winfo-list wset)
         for win = (wlf:window-window winfo)
         if (and win (window-live-p win)
