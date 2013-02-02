@@ -521,7 +521,8 @@ If RESTORE-WINDOW-SIZE is not nil, this function does not restore
 the current window size which can be modified by users."
   (wlf:maximize-info-clear)
   (wlf:with-wset wset
-    (let ((last-buffer (current-buffer)) val)
+    (let ((last-wname  (wlf:get-window-name wset (selected-window)))
+          (last-buffer (current-buffer)) val)
       (wlf:save-current-window-sizes recipe winfo-list)
       (select-window (wlf:clear-windows winfo-list wholep))
       (wlf:build-windows-rec recipe winfo-list)
@@ -534,8 +535,12 @@ the current window size which can be modified by users."
       
       (loop for h in (wlf:wset-layout-hook wset)
             do (funcall h wset))
-      
-      (wlf:aif (get-buffer-window last-buffer)
+
+      (wlf:aif (or
+                ;; Try to find active window by window name first:
+                (ignore-errors (wlf:get-window wset last-wname))
+                ;; If not found, select the same buffer as before:
+                (get-buffer-window last-buffer))
           (select-window it))
       val)))
 
