@@ -349,7 +349,13 @@ start dividing."
               (recenter 0)))
         (wlf:aif (wlf:window-option-get winfo :window-point)
             (with-current-buffer buffer
-              (goto-char it)))))))
+              ;; window-point may not be in visible range.  In that
+              ;; case, do not set point.
+              (let ((win-last-point (save-excursion
+                                      (move-to-window-line -1)
+                                      (point-at-eol))))
+                (when (<= it win-last-point)
+                  (goto-char it)))))))))
 
 (defun wlf:collect-window-edges (winfo-list)
   "[internal] At the end of window laying out, this function is
