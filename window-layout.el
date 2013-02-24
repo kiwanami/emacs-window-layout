@@ -342,18 +342,22 @@ start dividing."
     (let ((buffer (wlf:aif (wlf:window-option-get winfo :buffer)
                       (get-buffer it))))
       (when (buffer-live-p buffer)
-        (set-window-buffer (selected-window) buffer)
+        (set-window-buffer (selected-window) buffer)))))
+
+(defun wlf:set-window-points (winfo)
+  "[internal] Set window points recorded in WINFO."
+  (let ((window (wlf:window-window winfo)))
+    (when (window-live-p window)
+      (with-selected-window window
         (wlf:aif (wlf:window-option-get winfo :window-first-line-point)
-            (with-current-buffer buffer
+            (progn
               (goto-char it)
               (recenter 0)))
         (wlf:aif (wlf:window-option-get winfo :window-point)
-            (with-current-buffer buffer
+            (progn
               ;; window-point may not be in visible range.  In that
               ;; case, do not set point.
-              (let ((win-last-point (save-excursion
-                                      (move-to-window-line -1)
-                                      (point-at-eol))))
+              (let ((win-last-point (window-end nil t)))
                 (when (<= it win-last-point)
                   (goto-char it)))))))))
 
@@ -532,6 +536,7 @@ the current window size which can be modified by users."
       (wlf:save-current-window-sizes recipe winfo-list)
       (select-window (wlf:clear-windows winfo-list wholep))
       (wlf:build-windows-rec recipe winfo-list)
+      (mapc #'wlf:set-window-points winfo-list)
       (unless restore-window-size
         (wlf:restore-window-sizes winfo-list))
       (wlf:collect-window-edges winfo-list)
