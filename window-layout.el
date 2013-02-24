@@ -358,8 +358,9 @@ start dividing."
               ;; window-point may not be in visible range.  In that
               ;; case, do not set point.
               (let ((win-last-point (window-end nil t)))
-                (when (<= it win-last-point)
-                  (goto-char it)))))))))
+                (goto-char (if (< it win-last-point)
+                               it
+                             (1- win-last-point))))))))))
 
 (defun wlf:collect-window-edges (winfo-list)
   "[internal] At the end of window laying out, this function is
