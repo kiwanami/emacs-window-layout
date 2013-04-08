@@ -1,9 +1,9 @@
 ;;; window-layout.el --- window layout manager
 
-;; Copyright (C) 2010, 2011  SAKURAI Masashi
+;; Copyright (C) 2010, 2011, 2012, 2013  SAKURAI Masashi
 
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
-;; Version: 1.1
+;; Version: 1.2
 ;; Keywords: window, layout
 
 ;; This program is free software; you can redistribute it and/or modify
