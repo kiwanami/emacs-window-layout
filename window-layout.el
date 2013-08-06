@@ -653,7 +653,8 @@ name or object to show in the window."
   (let* ((winfo 
           (wlf:get-winfo 
            winfo-name (wlf:wset-winfo-list wset)))
-         (window (wlf:window-live-window winfo)))
+         (window (wlf:window-live-window winfo))
+         (curwin (selected-window)))
     (unless (buffer-live-p buf)
       (error "Buffer is dead. at wlf:set-buffer. (%s)" winfo-name))
     (plist-put (wlf:window-options winfo) :buffer buf)
@@ -662,8 +663,11 @@ name or object to show in the window."
                :window-first-line-point (wlf:window-first-line-point window))
     (when (and window (not (eql (get-buffer buf) (window-buffer window))))
       (set-window-buffer window buf))
-    (when selectp 
+    (cond
+     (selectp 
       (select-window window))
+     ((active-minibuffer-window)
+      (select-window (minibuffer-window))))
     window))
 
 (defun wlf:get-buffer (wset winfo-name)
