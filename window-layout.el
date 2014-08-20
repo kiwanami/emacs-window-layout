@@ -35,11 +35,11 @@
 ;;            (- (:upper-max-size 15) 
 ;;               summary 
 ;;               message))
-;;        '((:name 'folder 
+;;        '((:name folder 
 ;;           :buffer "folder buffer")
-;;          (:name 'summary
+;;          (:name summary
 ;;           :buffer "summary buffer")
-;;          (:name 'message
+;;          (:name message
 ;;           :buffer "message buffer")
 ;;         )))
 
