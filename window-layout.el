@@ -724,7 +724,7 @@ of a window name and a buffer object (or buffer name)."
   "[internal] Return a shallow copied window object."
   (make-wlf:window
    :name (wlf:window-name winfo)
-   :options (wlf:window-options winfo)
+   :options (copy-sequence (wlf:window-options winfo))
    :shown (wlf:window-shown winfo)
    :window (wlf:window-window winfo)
    :vertical (wlf:window-vertical winfo)
