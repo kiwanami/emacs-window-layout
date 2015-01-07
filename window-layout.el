@@ -148,25 +148,27 @@ of the WINDOW."
           (move-to-window-line 0)
           (point))))))
 
-;;; Window-set management structure
-;; recipe      : an input recipe object.
-;; winfo-list  : a list of window management structures.
-;; wholep      : if non nil, this function uses whole frame window.
-;; layout-hook : if doing layout windows, these hooks are called. 
-;;               The hook function has one argument: wset object.
+(defstruct wlf:wset
+"Window-set management structure
 
-(defstruct wlf:wset recipe winfo-list wholep layout-hook)
+recipe      : an input recipe object.
+winfo-list  : a list of window management structures.
+wholep      : if non nil, this function uses whole frame window.
+layout-hook : if doing layout windows, these hooks are called. 
+              The hook function has one argument: wset object."
+recipe winfo-list wholep layout-hook)
 
-;;; Window management structure
-;; name      : a symbol of the window name.
-;; options   : an option plist given by the recipe.
-;; shown     : 'show/'hide. if 'hide, the window is not displayed.
-;; window    : a window object.
-;; vertical  : if the window is split vertically, the value is t.
-;; last-size : if the window is alive, the window size is saved before laying out.
-;; edges     : a list of window edges returned by `window-edges'.
+(defstruct wlf:window
+"Window management structure
 
-(defstruct wlf:window name options shown window vertical last-size edges)
+name      : a symbol of the window name.
+options   : an option plist given by the recipe.
+shown     : 'show/'hide. if 'hide, the window is not displayed.
+window    : a window object.
+vertical  : if the window is split vertically, the value is t.
+last-size : if the window is alive, the window size is saved before laying out.
+edges     : a list of window edges returned by `window-edges'."
+name options shown window vertical last-size edges)
 
 (defun wlf:window-shown-set (winfo i)
   "[internal] translate the argument: nil -> 'hide / t -> 'show"
@@ -345,7 +347,7 @@ start dividing."
         (set-window-buffer (selected-window) buffer)))))
 
 (defun wlf:set-window-points (winfo)
-  "[internal] Set window points recorded in WINFO."
+  "[internal] Set the scroll position and cursor one which are recorded in WINFO."
   (let ((window (wlf:window-window winfo)))
     (when (window-live-p window)
       (with-selected-window window
@@ -516,6 +518,7 @@ layout. See the comment of `wlf:layout' function for arguments."
                  :wholep (not subwindow-p)))
 
 (defmacro wlf:with-wset (wset &rest body)
+  "Define local variables: recipe, winfo-list, wholep, layout-hook."
   (declare (debug ("wset" sexp &rest form))
            (indent 1))
   `(let* 
@@ -820,6 +823,7 @@ It returns WINDOW by given name."
               finally return t)))))
 
 (defun wlf:wset-fix-windows (wset)
+  "Update window object instances with the current window configuration."
   (loop for winfo in (wlf:wset-winfo-list wset)
         for win = (wlf:window-window winfo)
         do
