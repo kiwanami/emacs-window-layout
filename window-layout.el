@@ -663,9 +663,6 @@ name or object to show in the window."
     (unless (buffer-live-p buf)
       (error "Buffer is dead. at wlf:set-buffer. (%s)" winfo-name))
     (plist-put (wlf:window-options winfo) :buffer buf)
-    (plist-put (wlf:window-options winfo) :window-point (window-point window))
-    (plist-put (wlf:window-options winfo)
-               :window-first-line-point (wlf:window-first-line-point window))
     (when (and window (not (eql (get-buffer buf) (window-buffer window))))
       (set-window-buffer window buf))
     (cond
