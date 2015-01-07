@@ -93,7 +93,7 @@
 ;; * Window options:
 
 ;;   :name  [*] the window name.
-;;   :buffer  a buffer name or a buffer object to show the window. If nil or omitted, the current buffer remains.
+;;   :buffer  a buffer name or a buffer object to show the window. If nil or omitted, the current buffer remains. If symbol, it is evaluated as a global variable.
 ;;   :default-hide  (t/nil) if t, the window is hided initially. (default: nil)
 ;;   :fix-size  (t/nil) if t, when the windows are laid out again, the window size is remained. (default: nil)
 
@@ -342,7 +342,9 @@ start dividing."
   (if (not (wlf:window-shown-p winfo))
       (delete-window (selected-window))
     (let ((buffer (wlf:aif (wlf:window-option-get winfo :buffer)
-                      (get-buffer it))))
+                      (get-buffer 
+                       (if (symbolp it) 
+                           (symbol-value it) it)))))
       (when (buffer-live-p buffer)
         (set-window-buffer (selected-window) buffer)))))
 
