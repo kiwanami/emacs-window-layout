@@ -123,7 +123,7 @@
 (eval-when-compile (require 'cl))
 
 (defmacro wlf:aif (test-form then-form &rest else-forms)
-  (declare (debug ("test-form" form "then-form" form &rest form))
+  (declare (debug (form form &rest form))
            (indent 2))
   `(let ((it ,test-form))
      (if it ,then-form ,@else-forms)))
