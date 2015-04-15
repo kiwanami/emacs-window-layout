@@ -357,13 +357,17 @@ start dividing."
             (progn
               (goto-char it)
               (recenter 0)))
+        ;; Go to previously saved window point if point is shown or
+        ;; end of buffer is shown (therefore the point is shown).  In
+        ;; the latter case, window point (`it') is also at the EOB
+        ;; (therefore `<' check does not work).
         (wlf:aif (wlf:window-option-get winfo :window-point)
             (progn
-              ;; window-point may not be in visible range.  In that
-              ;; case, do not set point.
               (let ((win-last-point (window-end nil t)))
-                (when (<= it win-last-point)
-                  (goto-char it)))))))))
+                (goto-char (if (or (< it win-last-point)
+                                   (= (point-max) win-last-point))
+                               it
+                             (1- win-last-point))))))))))
 
 (defun wlf:collect-window-edges (winfo-list)
   "[internal] At the end of window laying out, this function is
