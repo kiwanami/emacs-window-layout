@@ -525,7 +525,7 @@ layout. See the comment of `wlf:layout' function for arguments."
 
 (defmacro wlf:with-wset (wset &rest body)
   "Define local variables: recipe, winfo-list, wholep, layout-hook."
-  (declare (debug ("wset" sexp &rest form))
+  (declare (debug (symbolp &rest form))
            (indent 1))
   `(let* 
        ((recipe (wlf:wset-recipe wset))
