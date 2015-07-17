@@ -196,7 +196,7 @@ in current frame."
            (and swin 
                 (destructuring-bind
                     (sl st sr sb) (window-edges swin)
-                  (if (and (equal left sl) (equal top st)) t
+                  (if (and (equal left sl) (< (abs (- top st)) 3)) t
                     (message "OLD:%S  NEW:%S"
                              (wlf:window-edges winfo) (window-edges swin)) nil))
                 swin)))))
