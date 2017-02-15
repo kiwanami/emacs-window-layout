@@ -1,9 +1,9 @@
 ;;; window-layout.el --- window layout manager
 
-;; Copyright (C) 2010, 2011, 2012, 2013, 2014  SAKURAI Masashi
+;; Copyright (C) 2010-2017  SAKURAI Masashi
 
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
-;; Version: 1.3
+;; Version: 1.4
 ;; Keywords: window, layout
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -138,7 +138,7 @@
              (let ((it ,sym)) ,@(cdr cl1))
            (wlf:acond ,@(cdr clauses)))))))
 
-(defun wlf:window-first-line-point (window)
+(defun wlf:current-first-line-point (window)
   "[internal] return the point at the beginning of the first line
 of the WINDOW."
   (when (windowp window)
@@ -167,8 +167,13 @@ shown     : 'show/'hide. if 'hide, the window is not displayed.
 window    : a window object.
 vertical  : if the window is split vertically, the value is t.
 last-size : if the window is alive, the window size is saved before laying out.
-edges     : a list of window edges returned by `window-edges'."
-name options shown window vertical last-size edges)
+edges     : a list of window edges returned by `window-edges'.
+first-line-point : the cursor position of the window.
+window-point     : the scroll position of the window.
+(If more than 2 windows display the same buffer, 
+the values of first-line-point and window-point may 
+be different between windows.)"
+name options shown window vertical last-size edges first-line-point window-point)
 
 (defun wlf:window-shown-set (winfo i)
   "[internal] translate the argument: nil -> 'hide / t -> 'show"
@@ -353,17 +358,19 @@ start dividing."
   (let ((window (wlf:window-window winfo)))
     (when (window-live-p window)
       (with-selected-window window
-        (wlf:aif (wlf:window-option-get winfo :window-first-line-point)
+        (wlf:aif (wlf:window-first-line-point winfo)
             (progn
+              ;;(message "WLF:set-window-points: [%s] first-line: %i" (wlf:window-name winfo) it)
               (goto-char it)
               (recenter 0)))
         ;; Go to previously saved window point if point is shown or
         ;; end of buffer is shown (therefore the point is shown).  In
         ;; the latter case, window point (`it') is also at the EOB
         ;; (therefore `<' check does not work).
-        (wlf:aif (wlf:window-option-get winfo :window-point)
+        (wlf:aif (wlf:window-window-point winfo)
             (progn
               (let ((win-last-point (window-end nil t)))
+                ;;(message "WLF:set-window-points: [%s] window-point: %i  last-point: %i" (wlf:window-name winfo) it win-last-point)
                 (goto-char (if (or (< it win-last-point)
                                    (= (point-max) win-last-point))
                                it
@@ -496,12 +503,11 @@ The saved points are used in `wlf:apply-winfo'."
                   (setf (wlf:window-last-size winfo)
                         (and win
                              (wlf:max-window-size-p winfo)
-                             (wlf:window-size winfo)))
-                  (plist-put (wlf:window-options winfo)
-                             :window-point (and win (window-point win)))
-                  (plist-put (wlf:window-options winfo)
-                             :window-first-line-point
-                             (wlf:window-first-line-point win))))))
+                             (wlf:window-size winfo))
+                        (wlf:window-window-point winfo)
+                        (and win (window-point win))
+                        (wlf:window-first-line-point winfo)
+                        (wlf:current-first-line-point win))))))
   (set-frame-parameter (selected-frame) 'wlf:recipe recipe))
 
 
@@ -824,6 +830,15 @@ It returns WINDOW by given name."
                  ((memq sw windows) (return nil))
                  (t (push sw windows))))
               finally return t)))))
+
+(defun wlf:wset-clear-window-points (wset)
+  "Clear the last preserved window-point and first-line-point slots for all windows.
+If users want change the window layout and re-use `wlf:wset' instance,
+  this function should be called to forget wrong window-positions."
+  (loop for winfo in (wlf:wset-winfo-list wset)
+        do
+        (setf (wlf:window-window-point winfo) nil
+              (wlf:window-first-line-point winfo) nil)))
 
 (defun wlf:wset-fix-windows (wset)
   "Update window object instances with the current window configuration."
