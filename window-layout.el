@@ -1,9 +1,9 @@
-;;; window-layout.el --- window layout manager
+;;; window-layout.el --- window layout manager  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2010-2017  SAKURAI Masashi
+;; Copyright (C) 2024 SAKURAI Masashi
 
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
-;; Version: 1.4
+;; Version: 1.5
 ;; Keywords: window, layout
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -120,7 +120,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 (defmacro wlf:aif (test-form then-form &rest else-forms)
   (declare (debug (form form &rest form))
@@ -148,7 +148,7 @@ of the WINDOW."
           (move-to-window-line 0)
           (point))))))
 
-(defstruct wlf:wset
+(cl-defstruct wlf:wset
 "Window-set management structure
 
 recipe      : an input recipe object.
@@ -158,7 +158,7 @@ layout-hook : if doing layout windows, these hooks are called.
               The hook function has one argument: wset object."
 recipe winfo-list wholep layout-hook)
 
-(defstruct wlf:window
+(cl-defstruct wlf:window
 "Window management structure
 
 name      : a symbol of the window name.
@@ -195,11 +195,11 @@ name options shown window vertical last-size edges first-line-point window-point
 This function retrieves the window object from the edge position
 in current frame."
   (and (wlf:window-edges winfo)
-       (destructuring-bind
+       (cl-destructuring-bind
            (left top right bottom) (wlf:window-edges winfo)
          (let ((swin (window-at (+ 2 left) (+ 2 top))))
            (and swin 
-                (destructuring-bind
+                (cl-destructuring-bind
                     (sl st sr sb) (window-edges swin)
                   (if (and (equal left sl) (< (abs (- top st)) 3)) t
                     (message "OLD:%S  NEW:%S"
@@ -236,12 +236,12 @@ start dividing."
     (get-largest-window))
    (t      ; nested windows
     (let ((wins 
-           (loop for i in winfo-list
+           (cl-loop for i in winfo-list
                  for win = (wlf:window-live-window i)
                  if win
                  collect win)))
       (if (> (length wins) 1)
-          (loop for w in (cdr wins)
+          (cl-loop for w in (cdr wins)
                 unless (one-window-p)
                 do (delete-window w)))
       (or (car wins) (selected-window))))))
@@ -249,7 +249,7 @@ start dividing."
 (defun wlf:get-winfo (name winfo-list)
   "[internal] Select a window info object from a winfo list."
   (wlf:aif 
-      (loop for i in winfo-list
+      (cl-loop for i in winfo-list
             when (eq (wlf:window-name i) name)
             return i) it
     (error "Window name %s is not found." name)))
@@ -379,7 +379,7 @@ start dividing."
 (defun wlf:collect-window-edges (winfo-list)
   "[internal] At the end of window laying out, this function is
 called to collect window edges."
-  (loop for winfo in winfo-list
+  (cl-loop for winfo in winfo-list
         if (wlf:window-live-window winfo)
         do 
         (setf (wlf:window-edges winfo)
@@ -388,29 +388,29 @@ called to collect window edges."
 (defun wlf:calculate-last-window-sizes (winfo-list)
   "[internal] Calculate summations of the last window size: width and height.
 Return a cons cell, car is width and cdr is height."
-  (loop for winfo in winfo-list
+  (cl-loop for winfo in winfo-list
         with width = 0 with height = 0
         for size = (wlf:window-last-size winfo)
         if size
         do (cond
             ((wlf:window-vertical winfo)
-             (incf height size))
+             (cl-incf height size))
             (t
-             (incf width size)))
+             (cl-incf width size)))
         finally return (cons width height)))
 
 (defun wlf:calculate-init-window-sizes (winfo-list)
   "[internal] Calculate summations of the initial window size: width and height.
 Return a cons cell, car is width and cdr is height."
-  (loop for winfo in winfo-list
+  (cl-loop for winfo in winfo-list
         with width = 0 with height = 0
         for win = (wlf:window-live-window winfo)
         if win
         do (cond
             ((wlf:window-vertical winfo)
-             (incf height (window-height win)))
+             (cl-incf height (window-height win)))
             (t
-             (incf width (window-width win))))
+             (cl-incf width (window-width win))))
         finally return (cons width height)))
 
 (defun wlf:restore-window-sizes (winfo-list)
@@ -423,7 +423,7 @@ Return a cons cell, car is width and cdr is height."
          (width-remainp  (eql (car last-size) total-width))
          (height-remainp (eql (cdr last-size) total-height)))
     ;;restore window size
-    (loop for winfo in winfo-list
+    (cl-loop for winfo in winfo-list
           for win = (wlf:window-live-window winfo)
           for to-size = (wlf:window-last-size winfo)
           for verticalp = (wlf:window-vertical winfo)
@@ -437,7 +437,7 @@ Return a cons cell, car is width and cdr is height."
 
 (defun wlf:make-winfo-list (wparams)
   "[internal] Return a list of window info objects."
-  (loop for p in wparams
+  (cl-loop for p in wparams
         collect (make-wlf:window 
                  :name (plist-get p ':name)
                  :options p)))
@@ -458,7 +458,7 @@ Return a cons cell, car is width and cdr is height."
             (setq split-options (cadr recipe))
             (cddr recipe))))
       (when split-options
-        (loop for i in split-options
+        (cl-loop for i in split-options
               do
               (if (symbolp i)
                   (let* ((label-name (symbol-name i)))
@@ -493,12 +493,12 @@ size (maximum window size), return t. Otherwise return nil."
   "[internal] Save current window sizes and points, before clearing
 the windows. The saved sizes are used at `wlf:restore-window-sizes'.
 The saved points are used in `wlf:apply-winfo'."
-  (loop for winfo in winfo-list
+  (cl-loop for winfo in winfo-list
         do (setf (wlf:window-last-size winfo) nil))
   (wlf:aif
       (frame-parameter (selected-frame) 'wlf:recipe)
       (if (equal recipe it)
-          (loop for winfo in winfo-list do
+          (cl-loop for winfo in winfo-list do
                 (let ((win (wlf:window-live-window winfo)))
                   (setf (wlf:window-last-size winfo)
                         (and win
@@ -559,7 +559,7 @@ the current window size which can be modified by users."
                                :winfo-list winfo-list
                                :wholep wholep))
       
-      (loop for h in (wlf:wset-layout-hook wset)
+      (cl-loop for h in (wlf:wset-layout-hook wset)
             do (funcall h wset))
 
       (wlf:aif (or
@@ -596,7 +596,7 @@ is returned by `wlf:layout'."
 
 (defun wlf:reset-init (wset)
   "Reset the window sizes and display statuses by window recipe parameters."
-  (loop for winfo in (wlf:wset-winfo-list wset)
+  (cl-loop for winfo in (wlf:wset-winfo-list wset)
         do (setf (wlf:window-shown winfo) nil))
   (wlf:layout-internal wset t))
 
@@ -604,7 +604,7 @@ is returned by `wlf:layout'."
   "Display the window. WSET is the management object which is
 returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (loop for wn in winfo-names
+  (cl-loop for wn in winfo-names
         do
         (wlf:window-shown-set 
          (wlf:get-winfo
@@ -615,7 +615,7 @@ defined by the argument of `wlf:layout'."
   "Hide the window. WSET is the management object which
 is returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (loop for wn in winfo-names
+  (cl-loop for wn in winfo-names
         do
         (wlf:window-shown-set
          (wlf:get-winfo 
@@ -626,7 +626,7 @@ defined by the argument of `wlf:layout'."
   "Toggle the window. WSET is the management object which
 is returned by `wlf:layout'. WINFO-NAME is the window name which is
 defined by the argument of `wlf:layout'."
-  (loop for wn in winfo-names
+  (cl-loop for wn in winfo-names
         do
         (wlf:window-shown-toggle
          (wlf:get-winfo wn (wlf:wset-winfo-list wset))))
@@ -707,11 +707,11 @@ the argument of `wlf:layout'."
 function replaces or adds buffer objects in the window options.
 WOPTS is a window option list. BUFFER-ALIST is an alist of pairs
 of a window name and a buffer object (or buffer name)."
-  (loop 
+  (cl-loop 
    for pair in buffer-alist
    for name = (car pair)
    for buf = (cdr pair)
-   for opts = (loop
+   for opts = (cl-loop
                for i in wopts 
                if (eq (plist-get i ':name) name) 
                return i)
@@ -722,7 +722,7 @@ of a window name and a buffer object (or buffer name)."
   "Return a copied wset object for `set-window-configuration' hacking."
   (make-wlf:wset 
    :recipe (wlf:wset-recipe wset)
-   :winfo-list (loop for i in (wlf:wset-winfo-list wset)
+   :winfo-list (cl-loop for i in (wlf:wset-winfo-list wset)
                      collect (wlf:copy-winfo i))
    :wholep (wlf:wset-wholep wset)
    :layout-hook (wlf:wset-layout-hook wset)))
@@ -752,14 +752,14 @@ of a window name and a buffer object (or buffer name)."
 
 (defun wlf:collect-window-states (wset)
   "[internal] Collect current window states."
-  (loop for winfo in (wlf:wset-winfo-list wset)
+  (cl-loop for winfo in (wlf:wset-winfo-list wset)
         collect (cons (wlf:window-name winfo)
                       (wlf:window-shown-p winfo))))
 
 (defun wlf:revert-window-states (wset states)
   "[internal] Revert window states whose are collected by
 `wlf:collect-window-states'."
-  (loop for s in states
+  (cl-loop for s in states
         with winfo-list = (wlf:wset-winfo-list wset)
         for wname = (car s)
         for winfo = (wlf:get-winfo wname winfo-list)
@@ -768,7 +768,7 @@ of a window name and a buffer object (or buffer name)."
 (defun wlf:maximize-window-states (wset winfo-name)
   "[internal] Set show state at the WINFO-NAME window, set hide
 state at the other windows."
-  (loop for winfo in (wlf:wset-winfo-list wset)
+  (cl-loop for winfo in (wlf:wset-winfo-list wset)
         if (eq (wlf:window-name winfo) winfo-name)
         do (wlf:window-shown-set winfo t)
         else
@@ -802,7 +802,7 @@ If the WINDOW is not found, return nil.
 
 See also `wlf:get-window'.  It is sort of the inverse function.
 It returns WINDOW by given name."
-  (loop for winfo in (wlf:wset-winfo-list wset)
+  (cl-loop for winfo in (wlf:wset-winfo-list wset)
         for win = (wlf:window-window winfo)
         if (and win (window-live-p win)
                 (eql win window))
@@ -811,23 +811,23 @@ It returns WINDOW by given name."
 (defun wlf:wset-live-p (wset)
   "Return t if WSET is valid, return nil otherwise."
   (let ((die-count 0) (shown-count 0))
-    (loop for winfo in (wlf:wset-winfo-list wset)
+    (cl-loop for winfo in (wlf:wset-winfo-list wset)
           for win = (wlf:window-window winfo)
           if (wlf:window-shown-p winfo)
           do 
-          (incf shown-count)
+          (cl-incf shown-count)
           (unless (and win (window-live-p win))
-            (incf die-count)))
+            (cl-incf die-count)))
     (cond
      ((= die-count 0) t)
-     (t (loop for winfo in (wlf:wset-winfo-list wset)
+     (t (cl-loop for winfo in (wlf:wset-winfo-list wset)
               for (left top right bottom) = (wlf:window-edges winfo)
               for sw = (window-at left top)
               with windows = nil
               do
               (when sw
                 (cond
-                 ((memq sw windows) (return nil))
+                 ((memq sw windows) (cl-return nil))
                  (t (push sw windows))))
               finally return t)))))
 
@@ -835,14 +835,14 @@ It returns WINDOW by given name."
   "Clear the last preserved window-point and first-line-point slots for all windows.
 If users want change the window layout and re-use `wlf:wset' instance,
   this function should be called to forget wrong window-positions."
-  (loop for winfo in (wlf:wset-winfo-list wset)
+  (cl-loop for winfo in (wlf:wset-winfo-list wset)
         do
         (setf (wlf:window-window-point winfo) nil
               (wlf:window-first-line-point winfo) nil)))
 
 (defun wlf:wset-fix-windows (wset)
   "Update window object instances with the current window configuration."
-  (loop for winfo in (wlf:wset-winfo-list wset)
+  (cl-loop for winfo in (wlf:wset-winfo-list wset)
         for win = (wlf:window-window winfo)
         do
         (cond
